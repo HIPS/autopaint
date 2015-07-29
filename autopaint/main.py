@@ -1,163 +1,80 @@
 # Main demo script
-from __future__ import absolute_import
-from __future__ import print_function
 import autograd.numpy as np
-import autograd.numpy.random as npr
-from autograd.scipy.misc import logsumexp
-from autograd import grad
-from autograd.util import quick_grad_check
-
-import matplotlib.pyplot as plt
+from autograd import value_and_grad
+from scipy.optimize import minimize
+import numpy.linalg
 import matplotlib.image
+import pickle
 
-def make_nn_funs(layer_sizes, L2_reg):
-    shapes = zip(layer_sizes[:-1], layer_sizes[1:])
-    N = sum((m+1)*n for m, n in shapes)
+from util import *
 
-    def unpack_layers(W_vect):
-        for m, n in shapes:
-            yield W_vect[:m*n].reshape((m,n)), W_vect[m*n:m*n+n]
-            W_vect = W_vect[(m+1)*n:]
+num_classes = 10
 
-    def predictions(W_vect, inputs):
-        for W, b in unpack_layers(W_vect):
-            outputs = np.dot(inputs, W) + b
-            inputs = np.tanh(outputs)
-        return outputs - logsumexp(outputs, axis=1, keepdims=True)
-
-    def loss(W_vect, X, T):
-        log_prior = -L2_reg * np.dot(W_vect, W_vect)
-        log_lik = np.sum(predictions(W_vect, X) * T)
-        return - log_prior - log_lik
-
-    def frac_err(W_vect, X, T):
-        return np.mean(np.argmax(T, axis=1) != np.argmax(pred_fun(W_vect, X), axis=1))
-
-    return N, predictions, loss, frac_err
+def build_image_loglik(all_mean, all_cov):
+    # Define log-likelihood of natural-image prior.
+    (sign, logdet) = numpy.linalg.slogdet(all_cov)
+    print "logdet", logdet
+    pinv = np.linalg.pinv(all_cov)
+    const =  -0.5 * len(all_mean) * np.log(2*np.pi) - 0.5 * logdet
+    def image_prior_log_likelihood(image):
+        minus_mean = image - all_mean
+        return const - 0.5 * np.dot(np.dot(minus_mean.T, pinv), minus_mean)
+    return image_prior_log_likelihood
 
 
-def load_mnist():
-    print("Loading training data...")
-    import imp, urllib
-    partial_flatten = lambda x : np.reshape(x, (x.shape[0], np.prod(x.shape[1:])))
-    one_hot = lambda x, K: np.array(x[:,None] == np.arange(K)[None, :], dtype=int)
-    source, _ = urllib.urlretrieve(
-        'https://raw.githubusercontent.com/HIPS/Kayak/master/examples/data.py')
-    data = imp.load_source('data', source).mnist()
-    train_images, train_labels, test_images, test_labels = data
-    train_images = partial_flatten(train_images) / 255.0
-    test_images  = partial_flatten(test_images)  / 255.0
-    train_labels = one_hot(train_labels, 10)
-    test_labels = one_hot(test_labels, 10)
-    N_data = train_images.shape[0]
+def sanity_checking_plots():
+    sample_from_gaussian_model(train_images,'all')
 
-    return N_data, train_images, train_labels, test_images, test_labels
+    # Class-conditional models
+    for i in range(num_classes):
+        cur_class_rows = train_labels[:, i] == 1
+        cur_class_images = train_images[cur_class_rows, :]
+        print 'trainI shape:', cur_class_images.shape
+        sample_from_gaussian_model(cur_class_images, '../figures/sample ' + str(i))
 
 
-def make_batches(N_data, batch_size):
-    return [slice(i, min(i+batch_size, N_data))
-            for i in range(0, N_data, batch_size)]
-
-def plot_images(images, ax, ims_per_row=5, padding=5, digit_dimensions=(28,28),
-                cmap=matplotlib.cm.binary, vmin=None):
-
-    """iamges should be a (N_images x pixels) matrix."""
-    N_images = images.shape[0]
-    N_rows = np.ceil(float(N_images) / ims_per_row)
-    pad_value = np.min(images.ravel())
-    concat_images = np.full(((digit_dimensions[0] + padding) * N_rows + padding,
-                            (digit_dimensions[0] + padding) * ims_per_row + padding), pad_value)
-    for i in range(N_images):
-        cur_image = np.reshape(images[i, :], digit_dimensions)
-        row_ix = i / ims_per_row  # Integer division.
-        col_ix = i % ims_per_row
-        row_start = padding + (padding + digit_dimensions[0])*row_ix
-        col_start = padding + (padding + digit_dimensions[0])*col_ix
-        concat_images[row_start: row_start + digit_dimensions[0],
-                      col_start: col_start + digit_dimensions[0]] \
-            = cur_image
-    cax = ax.matshow(concat_images, cmap=cmap, vmin=vmin)
-    plt.xticks(np.array([]))
-    plt.yticks(np.array([]))
-    return cax
-
+def model_mnist():
+    # Load and process MNIST data
+    N_data, train_images, train_labels, test_images, test_labels = load_mnist()
+    trained_weights = train_nn(train_images, train_labels, test_images, test_labels)
+    all_mean, all_cov = mean_and_cov(train_images)
+    mnist_models = trained_weights, all_mean, all_cov
+    with open('mnist_models.pkl', 'w') as f:
+        pickle.dump(mnist_models, f, 1)
 
 if __name__ == '__main__':
-    # Network parameters
-    layer_sizes = [784, 200, 100, 10]
-    L2_reg = 1.0
 
-    # Training parameters
-    param_scale = 0.1
-    learning_rate = 1e-3
-    momentum = 0.9
-    batch_size = 256
-    num_epochs = 50
+    #model_mnist()  # Comment this out after running once.
 
-    # Load and process MNIST data (borrowing from Kayak)
-    N_data, train_images, train_labels, test_images, test_labels = load_mnist()
+    with open('mnist_models.pkl') as f:
+        trained_weights, all_mean, all_cov = pickle.load(f)
 
-	def simpleModel(train_images,identifier):
-		# Make "model of natural images"
-		empirical_mean = np.mean(train_images, 0)
-		centered = train_images - empirical_mean
-		empirical_cov = np.dot(centered.T, centered)
+    # Build natural image model.
+    image_prior_log_likelihood = build_image_loglik(all_mean, all_cov)
+    image_prior_nll = lambda i: -image_prior_log_likelihood(i)
+    image_prior_with_grad = value_and_grad(image_prior_nll)
 
-		# Plot the mean
-		meanName = identifier+'mean.png'
-		matplotlib.image.imsave(meanName, empirical_mean.reshape((28,28)))
+    # Build likelihood model.
+    N_weights, predict_fun, loss_fun, frac_err = make_nn_funs(layer_sizes, L2_reg)
+    classifier_loglik = lambda image, c: predict_fun(trained_weights, np.atleast_2d(image))[:, c]
 
-		# Draw a sample
-		sample = np.random.multivariate_normal(empirical_mean, empirical_cov, 10).reshape((10,28*28))
-
-		fig = plt.figure(0)
-		fig.clf()
-		ax = fig.add_subplot(1, 1, 1)
-		ax.set_title("Samples")
-		plot_images(sample, ax)
-		fig.set_size_inches((8,12))
-		sampleName = identifier+'sample.png'
-		plt.savefig(sampleName, pad_inches=0.05, bbox_inches='tight')
+    # Combine prior and likelihood.
+    model_nll = lambda image, c: -image_prior_log_likelihood(image) - classifier_loglik(image, c)
+    model_nll_with_grad = value_and_grad(model_nll)
 
 
-		simpleModel(train_images,'all')
+    # Optimize a random image to maximize this likelihood.
+    cur_class = 9
+    start_image = np.zeros((28*28))
+    quick_grad_check(image_prior_log_likelihood, start_image)
 
-	#Make class conditional models
-	for i in range(0,10):
-		#Compute conditional means
-		train_labelsI = (train_labels == i)
-		train_imagesI = train_images[train_labelsI,:]
-		print('trainI shape')
-		print(train_imagesI.shape)
-		simpleModel(train_imagesI,str(i))
+    def callback(image):
+        print "Cur loglik: ", image_prior_nll(image), "mean loglik:", image_prior_nll(all_mean)
+        matplotlib.image.imsave("../figures/optimizing", image.reshape((28,28)))
 
-
-def nonsesnes():
-    # Make neural net functions
-    N_weights, pred_fun, loss_fun, frac_err = make_nn_funs(layer_sizes, L2_reg)
-    loss_grad = grad(loss_fun)
-
-    # Initialize weights
-    rs = npr.RandomState()
-    W = rs.randn(N_weights) * param_scale
-
-    # Check the gradients numerically, just to be safe
-    quick_grad_check(loss_fun, W, (train_images, train_labels))
-
-    print("    Epoch      |    Train err  |   Test err  ")
-
-    def print_perf(epoch, W):
-        test_perf  = frac_err(W, test_images, test_labels)
-        train_perf = frac_err(W, train_images, train_labels)
-        print("{0:15}|{1:15}|{2:15}".format(epoch, train_perf, test_perf))
-
-    # Train with sgd
-    batch_idxs = make_batches(train_images.shape[0], batch_size)
-    cur_dir = np.zeros(N_weights)
-
-    for epoch in range(num_epochs):
-        print_perf(epoch, W)
-        for idxs in batch_idxs:
-            grad_W = loss_grad(W, train_images[idxs], train_labels[idxs])
-            cur_dir = momentum * cur_dir + (1.0 - momentum) * grad_W
-            W -= learning_rate * cur_dir
+    # Optimize using conjugate gradients.
+    result = minimize(model_nll_with_grad, callback=callback, x0=start_image, args=(cur_class),
+                      jac=True, method='BFGS')
+    final_image = result.x
+    matplotlib.image.imsave("../figures/optimal", final_image.reshape((28,28)))
+    print "Finished!"
