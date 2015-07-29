@@ -69,7 +69,7 @@ if __name__ == '__main__':
     quick_grad_check(image_prior_log_likelihood, start_image)
 
     def callback(image):
-        print "Cur loglik: ", image_prior_nll(image), "mean loglik:", image_prior_nll(all_mean)
+        #print "Cur loglik: ", image_prior_nll(image), "mean loglik:", image_prior_nll(all_mean)
         matplotlib.image.imsave("../figures/optimizing", image.reshape((28,28)))
 
     # Optimize using conjugate gradients.

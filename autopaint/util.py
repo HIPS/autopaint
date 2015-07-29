@@ -128,7 +128,7 @@ param_scale = 0.1
 learning_rate = 1e-3
 momentum = 0.9
 batch_size = 256
-num_epochs = 5
+num_epochs = 50
 
 def train_nn(train_images, train_labels, test_images, test_labels):
 
