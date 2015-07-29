@@ -97,24 +97,39 @@ if __name__ == '__main__':
     # Load and process MNIST data (borrowing from Kayak)
     N_data, train_images, train_labels, test_images, test_labels = load_mnist()
 
-    # Make "model of natural images"
-    empirical_mean = np.mean(train_images, 0)
-    centered = train_images - empirical_mean
-    empirical_cov = np.dot(centered.T, centered)
+	def simpleModel(train_images,identifier):
+		# Make "model of natural images"
+		empirical_mean = np.mean(train_images, 0)
+		centered = train_images - empirical_mean
+		empirical_cov = np.dot(centered.T, centered)
 
-    # Plot the mean
-    matplotlib.image.imsave('mean.png', empirical_mean.reshape((28,28)))
+		# Plot the mean
+		meanName = identifier+'mean.png'
+		matplotlib.image.imsave(meanName, empirical_mean.reshape((28,28)))
 
-    # Draw a sample
-    sample = np.random.multivariate_normal(empirical_mean, empirical_cov, 10).reshape((10,28*28))
+		# Draw a sample
+		sample = np.random.multivariate_normal(empirical_mean, empirical_cov, 10).reshape((10,28*28))
 
-    fig = plt.figure(0)
-    fig.clf()
-    ax = fig.add_subplot(1, 1, 1)
-    ax.set_title("Samples")
-    plot_images(sample, ax)
-    fig.set_size_inches((8,12))
-    plt.savefig('sample2.png', pad_inches=0.05, bbox_inches='tight')
+		fig = plt.figure(0)
+		fig.clf()
+		ax = fig.add_subplot(1, 1, 1)
+		ax.set_title("Samples")
+		plot_images(sample, ax)
+		fig.set_size_inches((8,12))
+		sampleName = identifier+'sample.png'
+		plt.savefig(sampleName, pad_inches=0.05, bbox_inches='tight')
+
+
+		simpleModel(train_images,'all')
+
+	#Make class conditional models
+	for i in range(0,10):
+		#Compute conditional means
+		train_labelsI = (train_labels == i)
+		train_imagesI = train_images[train_labelsI,:]
+		print('trainI shape')
+		print(train_imagesI.shape)
+		simpleModel(train_imagesI,str(i))
 
 
 def nonsesnes():
