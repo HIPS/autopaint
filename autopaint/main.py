@@ -42,7 +42,78 @@ def model_mnist():
     with open('mnist_models.pkl', 'w') as f:
         pickle.dump(mnist_models, f, 1)
 
+def test_energy_two_moons(z):
+    z1 = z[0]
+    z2 = z[1]
+    return 0.5 * ((np.sqrt(z1**2 + z2**2) - 2 ) / 0.4)**2\
+            - np.logaddexp(-0.5 * ((z1 - 2) / 0.6)**2, -0.5 * ((z1 + 2) / 0.6)**2)
+
+def test_energy_wiggle(z):
+    z1 = z[0]
+    z2 = z[1]
+    return 0.5 * (z2 - np.sin(2.0 * np.pi * z1 / 4.0) / 0.4 )**2 + 0.2 * (z1**2 + z2**2)
+
+def plot_2d_func(energy_func, filename, xlims=[-4.0, 4.0], ylims = [-4.0, 4.0]):
+    fig = plt.figure(0); fig.clf()
+    ax = fig.add_subplot(111)
+    x = np.linspace(*xlims, num=100)
+    y = np.linspace(*ylims, num=100)
+    X, Y = np.meshgrid(x, y)
+    zs = np.array([energy_func(np.concatenate(([x],[y]))) for x,y in zip(np.ravel(X), np.ravel(Y))])
+    Z = zs.reshape(X.shape)
+    Z = np.exp(-Z)
+    matplotlib.image.imsave(filename, Z)
+
+def plot_density(samples, filename, xlims=[-4.0, 4.0], ylims = [-4.0, 4.0]):
+    fig = plt.figure(0); fig.clf()
+    ax = fig.add_subplot(111)
+    x = np.linspace(*xlims, num=100)
+    y = np.linspace(*ylims, num=100)
+    plt.scatter(samples[:,0], samples[:,1])
+
+    plt.savefig(filename)
+    #X, Y = np.meshgrid(x, y)
+    #zs = np.array([energy_func(np.concatenate(([x],[y]))) for x,y in zip(np.ravel(X), np.ravel(Y))])
+    #Z = zs.reshape(X.shape)
+    #Z = np.exp(-Z)
+    #matplotlib.image.imsave(filename, Z)
+
+
+def build_langevin_sampler(target_nll_func):
+
+    def sample(params):
+        x, entropy = sgd_entropic(gradfun, x_scale, N_iter, learn_rate, rs, callback, approx=True)
+
+    def lower_bound_estimate(params):
+        z, entropy = sample(params)
+
+    #return sample_with_entropy, lower_bound_estimator
+
+
+
 if __name__ == '__main__':
+    #plot_2d_func(test_energy_wiggle, "../figures/wiggle_density.png")
+    #plot_2d_func(test_energy_two_moons, "../figures/two_moons_density.png")
+
+    num_samples = 1000
+    D = 2
+
+    gradfun = grad(lambda x, t: test_energy_wiggle(x))
+
+    samples = np.random.randn(num_samples, D)
+
+
+    for s in range(num_samples):
+        start = samples[s, :]
+        final, entropy = sgd_entropic(gradfun, start, N_iter=100, learn_rate=0.01,
+                                     rs=npr.RandomState(0), callback=None, approx=False)
+        samples[s, :] = final
+
+    plot_density(samples, "../figures/approximating_dist.png")
+
+
+
+def ignore():
 
     #model_mnist()  # Comment this out after running once.
 

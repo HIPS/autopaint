@@ -8,6 +8,63 @@ from autograd.util import quick_grad_check
 import matplotlib.pyplot as plt
 import matplotlib.image
 
+
+def entropy_of_a_gaussian(stddevs):
+    D = len(stddevs)
+    0.05 * D * (1 + np.log(2*np.pi)) + np.sum(np.log(stddevs))
+
+def sgd_entropic(gradfun, x, N_iter, learn_rate, rs, callback, approx=True):
+    D = len(x)
+
+    delta_entropy = 0.0
+    for t in xrange(N_iter):
+        g = gradfun(x, t)
+        hvp = grad(lambda x, vect : np.dot(gradfun(x, t), vect)) # Hessian vector product
+        jvp = lambda vect : vect - learn_rate * hvp(x, vect) # Jacobian vector product
+        if approx:
+            delta_entropy += approx_log_det(jvp, D, rs)
+        else:
+            delta_entropy += exact_log_det(jvp, D, rs)
+        if callback: callback(x=x, t=t, entropy=delta_entropy)
+        x -= learn_rate * g
+
+    return x, delta_entropy
+
+
+def sgd_entropic(gradfun, x_scale, N_iter, learn_rate, rs, callback, approx=True):
+    D = len(x_scale)
+    x = rs.randn(D) * x_scale
+    entropy = 0.5 * D * (1 + np.log(2*np.pi)) + np.sum(np.log(x_scale))
+    for t in xrange(N_iter):
+        g = gradfun(x, t)
+        hvp = grad(lambda x, vect : np.dot(gradfun(x, t), vect)) # Hessian vector product
+        jvp = lambda vect : vect - learn_rate * hvp(x, vect) # Jacobian vector product
+        if approx:
+            entropy += approx_log_det(jvp, D, rs)
+        else:
+            entropy += exact_log_det(jvp, D, rs)
+        if callback: callback(x=x, t=t, entropy=entropy)
+        x -= learn_rate * g
+
+    return x, entropy
+
+def approx_log_det(mvp, D, rs):
+    # This should be an unbiased estimator of a lower bound on the log determinant
+    # provided the eigenvalues are all greater than 0.317 (solution of
+    # log(x) = (x - 1) - (x - 1)**2 = -2 + 3 * x - x**2
+    R0 = rs.randn(D) # TODO: Consider normalizing R
+    R1 = mvp(R0)
+    R2 = mvp(R1)
+    return np.dot(R0, -2 * R0 + 3 * R1 - R2)
+
+def exact_log_det(mvp, D, rs=None):
+    mat = np.zeros((D, D))
+    eye = np.eye(D)
+    for i in range(D):
+        mat[:, i] = mvp(eye[:, i])
+    return np.log(np.linalg.det(mat))
+
+
 def make_nn_funs(layer_sizes, L2_reg):
     shapes = zip(layer_sizes[:-1], layer_sizes[1:])
     N = sum((m+1)*n for m, n in shapes)
