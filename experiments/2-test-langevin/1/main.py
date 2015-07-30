@@ -6,7 +6,8 @@ import numpy.linalg
 import matplotlib.image
 import pickle
 
-from util import *
+from autopaint.util import *
+from autopaint.plotting import *
 
 num_classes = 10
 
@@ -32,6 +33,8 @@ def sanity_checking_plots():
         print 'trainI shape:', cur_class_images.shape
         sample_from_gaussian_model(cur_class_images, '../figures/sample ' + str(i))
 
+    #plot_2d_func(test_energy_wiggle, "../figures/wiggle_density.png")
+    #plot_2d_func(test_energy_two_moons, "../figures/two_moons_density.png")
 
 def model_mnist():
     # Load and process MNIST data
@@ -53,47 +56,43 @@ def test_energy_wiggle(z):
     z2 = z[1]
     return 0.5 * (z2 - np.sin(2.0 * np.pi * z1 / 4.0) / 0.4 )**2 + 0.2 * (z1**2 + z2**2)
 
-def plot_2d_func(energy_func, filename, xlims=[-4.0, 4.0], ylims = [-4.0, 4.0]):
-    fig = plt.figure(0); fig.clf()
-    ax = fig.add_subplot(111)
-    x = np.linspace(*xlims, num=100)
-    y = np.linspace(*ylims, num=100)
-    X, Y = np.meshgrid(x, y)
-    zs = np.array([energy_func(np.concatenate(([x],[y]))) for x,y in zip(np.ravel(X), np.ravel(Y))])
-    Z = zs.reshape(X.shape)
-    Z = np.exp(-Z)
-    matplotlib.image.imsave(filename, Z)
-
-def plot_density(samples, filename, xlims=[-4.0, 4.0], ylims = [-4.0, 4.0]):
-    fig = plt.figure(0); fig.clf()
-    ax = fig.add_subplot(111)
-    x = np.linspace(*xlims, num=100)
-    y = np.linspace(*ylims, num=100)
-    plt.scatter(samples[:,0], samples[:,1])
-
-    plt.savefig(filename)
-    #X, Y = np.meshgrid(x, y)
-    #zs = np.array([energy_func(np.concatenate(([x],[y]))) for x,y in zip(np.ravel(X), np.ravel(Y))])
-    #Z = zs.reshape(X.shape)
-    #Z = np.exp(-Z)
-    #matplotlib.image.imsave(filename, Z)
-
-
 def build_langevin_sampler(target_nll_func):
 
-    def sample(params):
+    def sgd_entropic(gradfun, x, N_iter, learn_rates, noise_sizes, rs, callback, approx=True):
+        D = len(x)
+
+        delta_entropy = 0.0
+        for t in xrange(N_iter):
+            g = gradfun(x, t)
+            hvp = grad(lambda x, vect : np.dot(gradfun(x, t), vect)) # Hessian vector product
+            jvp = lambda vect : vect - learn_rates[t] * hvp(x, vect) # Jacobian vector product
+            if approx:
+                delta_entropy += approx_log_det(jvp, D, rs)
+            else:
+                delta_entropy += exact_log_det(jvp, D, rs)
+            if callback: callback(x=x, t=t, entropy=delta_entropy)
+            #noise = rs.randn(D) * noise_sizes[t]
+            #delta_entropy_noise = entropy_of_a_spherical_gaussian(noise_sizes[t], D)
+            x -= learn_rates[t] * g# + noise
+
+        return x, delta_entropy
+
+    def sample_with_entropy(params):
+
+        initial_entropy = entropy_of_a_gaussian(stddevs)
         x, entropy = sgd_entropic(gradfun, x_scale, N_iter, learn_rate, rs, callback, approx=True)
 
-    def lower_bound_estimate(params):
-        z, entropy = sample(params)
+    def lower_bound_estimator(params):
+        z, entropy_estimate = sample_with_entropy(params)
+        loglik_estimate = -target_nll_func(z)
+        return loglik_estimate + entropy_estimate
 
-    #return sample_with_entropy, lower_bound_estimator
+    return sample_with_entropy, lower_bound_estimator
 
 
 
 if __name__ == '__main__':
-    #plot_2d_func(test_energy_wiggle, "../figures/wiggle_density.png")
-    #plot_2d_func(test_energy_two_moons, "../figures/two_moons_density.png")
+
 
     num_samples = 1000
     D = 2
@@ -109,7 +108,7 @@ if __name__ == '__main__':
                                      rs=npr.RandomState(0), callback=None, approx=False)
         samples[s, :] = final
 
-    plot_density(samples, "../figures/approximating_dist.png")
+    plot_density(samples, "approximating_dist.png")
 
 
 
@@ -141,11 +140,11 @@ def ignore():
 
     def callback(image):
         #print "Cur loglik: ", image_prior_nll(image), "mean loglik:", image_prior_nll(all_mean)
-        matplotlib.image.imsave("../figures/optimizing", image.reshape((28,28)))
+        matplotlib.image.imsave("optimizing", image.reshape((28,28)))
 
     # Optimize using conjugate gradients.
     result = minimize(model_nll_with_grad, callback=callback, x0=start_image, args=(cur_class),
                       jac=True, method='BFGS')
     final_image = result.x
-    matplotlib.image.imsave("../figures/optimal", final_image.reshape((28,28)))
+    matplotlib.image.imsave("optimal", final_image.reshape((28,28)))
     print "Finished!"
