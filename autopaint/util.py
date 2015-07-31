@@ -1,69 +1,72 @@
 import autograd.numpy as np
-from autograd import grad
 
 
-def entropy_of_a_gaussian(stddevs):
-    # TODO: double check this formula.
-    D = len(stddevs)
-    0.05 * D * (1 + np.log(2*np.pi)) + np.sum(np.log(stddevs))
+class WeightsParser(object):
+    """A helper class to index into a parameter vector."""
+    def __init__(self):
+        self.idxs_and_shapes = {}
+        self.num_weights = 0
+
+    def add_shape(self, name, shape):
+        start = self.num_weights
+        self.num_weights += np.prod(shape)
+        self.idxs_and_shapes[name] = (slice(start, self.num_weights), shape)
+
+    def get(self, vect, name):
+        idxs, shape = self.idxs_and_shapes[name]
+        return np.reshape(vect[idxs], shape)
+
+    def put(self, vect, name, val):
+        idxs, shape = self.idxs_and_shapes[name]
+        vect[idxs].reshape(shape)[:] = val
+
+    def __len__(self):
+        return self.num_weights
 
 
-def entropy_of_a_spherical_gaussian(stddev, D):
-    # TODO: double check this formula.
-    0.05 * D * (1 + np.log(2*np.pi)) + D * np.log(stddev)
 
+class VectorParser(object):
+    def __init__(self):
+        self.idxs_and_shapes = OrderedDict()
+        self.vect = np.zeros((0,))
 
-def sgd_entropic(gradfun, x, N_iter, learn_rate, rs, callback, approx=True):
-    D = len(x)
+    def add_shape(self, name, shape):
+        start = len(self.vect)
+        size = np.prod(shape)
+        self.idxs_and_shapes[name] = (slice(start, start + size), shape)
+        self.vect = np.concatenate((self.vect, np.zeros(size)), axis=0)
 
-    delta_entropy = 0.0
-    for t in xrange(N_iter):
-        g = gradfun(x, t)
-        hvp = grad(lambda x, vect : np.dot(gradfun(x, t), vect)) # Hessian vector product
-        jvp = lambda vect : vect - learn_rate * hvp(x, vect) # Jacobian vector product
-        if approx:
-            delta_entropy += approx_log_det(jvp, D, rs)
-        else:
-            delta_entropy += exact_log_det(jvp, D, rs)
-        if callback: callback(x=x, t=t, entropy=delta_entropy)
-        x -= learn_rate * g
+    def new_vect(self, vect):
+        assert vect.size == self.vect.size
+        new_parser = self.empty_copy()
+        new_parser.vect = vect
+        return new_parser
 
-    return x, delta_entropy
+    def empty_copy(self):
+        """Creates a parser with a blank vector."""
+        new_parser = VectorParser()
+        new_parser.idxs_and_shapes = self.idxs_and_shapes.copy()
+        new_parser.vect = None
+        return new_parser
 
+    def as_dict(self):
+        return {k : self[k] for k in self.names}
 
-def sgd_entropic(gradfun, x_scale, N_iter, learn_rate, rs, callback, approx=True):
-    D = len(x_scale)
-    x = rs.randn(D) * x_scale
-    entropy = 0.5 * D * (1 + np.log(2*np.pi)) + np.sum(np.log(x_scale))
-    for t in xrange(N_iter):
-        g = gradfun(x, t)
-        hvp = grad(lambda x, vect : np.dot(gradfun(x, t), vect)) # Hessian vector product
-        jvp = lambda vect : vect - learn_rate * hvp(x, vect) # Jacobian vector product
-        if approx:
-            entropy += approx_log_det(jvp, D, rs)
-        else:
-            entropy += exact_log_det(jvp, D, rs)
-        if callback: callback(x=x, t=t, entropy=entropy)
-        x -= learn_rate * g
+    @property
+    def names(self):
+        return self.idxs_and_shapes.keys()
 
-    return x, entropy
+    def __getitem__(self, name):
+        idxs, shape = self.idxs_and_shapes[name]
+        return np.reshape(self.vect[idxs], shape)
 
+    def __setitem__(self, name, val):
+        if isinstance(val, list): val = np.array(val)
+        if name not in self.idxs_and_shapes:
+            self.add_shape(name, val.shape)
 
-def approx_log_det(mvp, D, rs):
-    # This should be an unbiased estimator of a lower bound on the log determinant
-    # provided the eigenvalues are all greater than 0.317 (solution of
-    # log(x) = (x - 1) - (x - 1)**2 = -2 + 3 * x - x**2
-    R0 = rs.randn(D) # TODO: Consider normalizing R
-    R1 = mvp(R0)
-    R2 = mvp(R1)
-    return np.dot(R0, -2 * R0 + 3 * R1 - R2)
-
-def exact_log_det(mvp, D, rs=None):
-    mat = np.zeros((D, D))
-    eye = np.eye(D)
-    for i in range(D):
-        mat[:, i] = mvp(eye[:, i])
-    return np.log(np.linalg.det(mat))
+        idxs, shape = self.idxs_and_shapes[name]
+        self.vect[idxs].reshape(shape)[:] = val
 
 
 def load_mnist():
