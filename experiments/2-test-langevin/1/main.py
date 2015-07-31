@@ -6,6 +6,8 @@ import numpy.linalg
 import matplotlib.image
 import pickle
 
+from autograd import grad
+
 from autopaint.plotting import *
 from autopaint.recognition import build_langevin_sampler
 
@@ -25,7 +27,8 @@ def test_energy_wiggle(z):
 if __name__ == '__main__':
 
     num_samples = 100
-    num_langevin_steps = 5
+    num_langevin_steps = 25
+    num_sampler_optimization_steps = 100
 
     D = 2
     init_mean = np.zeros(D)
@@ -35,7 +38,7 @@ if __name__ == '__main__':
 
     rs = np.random.npr.RandomState(0)
 
-    sample_and_run_langevin, parser = build_langevin_sampler(test_energy_wiggle, D)
+    sample_and_run_langevin, parser = build_langevin_sampler(test_energy_two_moons, D)
 
     sampler_params = np.zeros(len(parser))
     parser.put(sampler_params, 'mean', init_mean)
@@ -43,11 +46,23 @@ if __name__ == '__main__':
     parser.put(sampler_params, 'stepsizes', init_stepsizes)
     parser.put(sampler_params, 'noise_sizes', init_noise_sizes)
 
-    samples = np.zeros((num_samples, D))
-    for s in range(num_samples):
-        z, marginal_likelihood_estimate = sample_and_run_langevin(sampler_params, rs)
-        samples[s, :] = z
+    def get_batch_marginal_likelihood_estimate(sampler_params):
+        samples = [] # np.zeros((num_samples, D))
+        mls = []
+        for s in range(num_samples):
+            z, marginal_likelihood_estimate = sample_and_run_langevin(sampler_params, rs)
+            #samples.append(z)
+            mls.append(marginal_likelihood_estimate)
+        #plot_density(samples, "approximating_dist.png")
+        return np.sum(mls)
 
-    plot_density(samples, "approximating_dist.png")
+    ml_and_grad = value_and_grad(get_batch_marginal_likelihood_estimate)
+
+    for i in xrange(num_sampler_optimization_steps):
+        ml, dml = ml_and_grad(sampler_params)
+        print "ml:", ml
+        sampler_params = sampler_params + 0.01 * dml
+
+
 
 

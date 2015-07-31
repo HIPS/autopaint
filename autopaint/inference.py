@@ -59,12 +59,13 @@ def gradient_ascent_entropic(gradfun, entropy, x, stepsizes, noise_sizes, rs, ca
         x = x + noise
 
         # Update entropy estimate.
+        entropy += delta_entropy
         noise_entropy = entropy_of_a_spherical_gaussian(noise_sizes[t], D)
         entropy = sum_entropy_lower_bound(entropy, noise_entropy, D)
 
     return x, entropy
 
-def build_langevin_sampler(target_nll_func, D, num_steps):
+def build_langevin_sampler(loglik_func, D, num_steps):
 
     # Build parser
     parser = WeightsParser()
@@ -73,7 +74,7 @@ def build_langevin_sampler(target_nll_func, D, num_steps):
     parser.add_shape('log_stepsizes', num_steps)
     parser.add_shape('log_noise_sizes', num_steps)
 
-    gradfun = grad(target_nll_func)
+    gradfun = grad(loglik_func)
 
     def sample_and_run_langevin(params, rs, callback=None):
         mean = parser.get(params, 'mean')
@@ -87,7 +88,7 @@ def build_langevin_sampler(target_nll_func, D, num_steps):
         z, final_entropy = gradient_ascent_entropic(gradfun, entropy=initial_entropy, x=init_x,
                                                     stepsizes=stepsizes, noise_sizes=noise_sizes,
                                                     rs=rs, callback=callback, approx=True)
-        loglik_estimate = -target_nll_func(z)
+        loglik_estimate = loglik_func(z)
         marginal_likelihood_estimate = loglik_estimate + final_entropy
         return z, marginal_likelihood_estimate
 
