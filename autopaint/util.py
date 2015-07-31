@@ -23,8 +23,6 @@ class WeightsParser(object):
     def __len__(self):
         return self.num_weights
 
-
-
 class VectorParser(object):
     def __init__(self):
         self.idxs_and_shapes = OrderedDict()
@@ -99,3 +97,5 @@ def sample_from_gaussian_model(images, prefix):
     mean, cov = mean_and_cov(images)
     plot_samples(mean, cov, prefix)
 
+def fast_array_from_list(xs):
+    return np.concatenate([np.expand_dims(x, axis=0) for x in xs], axis=0)
