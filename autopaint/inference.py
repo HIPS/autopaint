@@ -48,7 +48,7 @@ def sum_entropy_lower_bound(entropy_a, entropy_b, D):
     return 0.5 * D * np.logaddexp(2.0 * entropy_a / D, 2.0 * entropy_b / D)
 
 def gradient_ascent_entropic(gradfun, entropy, x, stepsizes, noise_sizes, rs, callback, approx=True):
-    assert len(stepsizes) == len(noise_sizes)
+    # assert len(stepsizes) == len(noise_sizes)
     D = len(x)
     num_steps = len(stepsizes)
 

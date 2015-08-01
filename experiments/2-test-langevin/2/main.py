@@ -5,6 +5,7 @@ from scipy.optimize import minimize
 import numpy.linalg
 import matplotlib.image
 import pickle
+import time
 
 from autograd import grad
 
@@ -17,8 +18,8 @@ from autopaint.inference import build_langevin_sampler
 def logprob_two_moons(z):
     z1 = z[0]
     z2 = z[1]
-    return - 0.5 * ((np.sqrt(z1**2 + z2**2) - 2 ) / 0.4)**2\
-            + np.logaddexp(-0.5 * ((z1 - 2) / 0.6)**2, -0.5 * ((z1 + 2) / 0.6)**2)
+    return (- 0.5 * ((np.sqrt(z1**2 + z2**2) - 2 ) / 0.4)**2\
+            + np.logaddexp(-0.5 * ((z1 - 2) / 0.6)**2, -0.5 * ((z1 + 2) / 0.6)**2))
 
 def logprob_wiggle(z):
     z1 = z[0]
@@ -63,20 +64,23 @@ def plot_sampler_params(params, filename):
 
 if __name__ == '__main__':
 
-    num_samples = 200
-    num_langevin_steps = 3
+    t0 = time.time()
+
+
+    num_samples = 50
+    num_langevin_steps = 10
     num_sampler_optimization_steps = 20
-    sampler_learn_rate = 0.01
+    sampler_learn_rate = 0.15
 
     D = 2
-    init_mean = np.ones(D)
-    init_stddevs = np.ones(D) / 100
-    init_log_stepsizes = np.log(0.01*np.ones(num_langevin_steps))
-    init_log_noise_sizes = np.log(0.1*np.ones(num_langevin_steps))
+    init_mean = np.zeros(D)
+    init_stddevs = np.ones(D)
+    init_log_stepsizes = np.log(0.1*np.ones(num_langevin_steps))
+    init_log_noise_sizes = np.log(.01*np.ones(num_langevin_steps))
 
     rs = np.random.npr.RandomState(0)
 
-    sample_and_run_langevin, parser = build_langevin_sampler(logprob_mvn, D, num_langevin_steps)
+    sample_and_run_langevin, parser = build_langevin_sampler(logprob_two_moons, D, num_langevin_steps)
 
     sampler_params = np.zeros(len(parser))
     parser.put(sampler_params, 'mean', init_mean)
@@ -105,7 +109,7 @@ if __name__ == '__main__':
         plot_sampler_params(sampler_params, 'sampler_params.png')
         sampler_params = sampler_params + sampler_learn_rate * dml
 
-
-
+    t1 = time.time()
+    print "total runtime", t1-t0
 
 
