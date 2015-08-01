@@ -1,7 +1,7 @@
 import autograd.numpy as np
-from autograd import grad
+from autograd import grad, elementwise_grad
 
-from .util import WeightsParser
+from .util import WeightsParser, fast_array_from_list
 
 
 def entropy_of_a_gaussian(stddevs):
@@ -25,21 +25,50 @@ def approx_log_det(mvp, D, rs):
 def exact_log_det(mvp, D):
     mat = np.zeros((D, D))
     eye = np.eye(D)
-    for i in range(D):
+    for i in xrange(D):
         mat[:, i] = mvp(eye[:, i])
-    return np.log(np.linalg.det(mat))
+    sign, logdet = np.linalg.slogdet(mat)
+    return logdet
 
-def gradient_step_track_entropy(gradfun, x, stepsize, rs, approx=False):
+def exact_log_det_vectorized(mvp_vec, D, N):
+    mat = np.zeros((N, D, D))
+    eye = np.eye(D)
+    for i in xrange(D):
+        mat[:, :, i] =  mvp_vec(eye[:, i])
+    logdets = []
+    for cur_mat in mat:  # Not vectorized, but could be if autograd supported vectorized calls to slogdet.
+        sign, logdet = np.linalg.slogdet(cur_mat)
+        logdets.append(logdet)
+    return fast_array_from_list(logdets)
+
+def gradient_step_track_entropy(gradfun, init_x, stepsize, rs, approx=False):
     """Takes one gradient step, and returns an estimate of the change in entropy."""
+    x = init_x
+    (N, D) = x.shape
+    assert N == 1
     g = gradfun(x)
-    hvp = grad(lambda x, vect : np.dot(gradfun(x), vect)) # Hessian vector product
-    jvp = lambda vect : vect + stepsize * hvp(x, vect) # Jacobian vector product
+    hvp = grad(lambda x, vect : np.dot(gradfun(x), vect))  # Hessian-vector product
+    jvp = lambda vect : vect + stepsize * hvp(x, vect)     # Jacobian-vector product
     if approx:
-        delta_entropy = approx_log_det(jvp, len(x), rs)
+        delta_entropy = approx_log_det(jvp, D, rs)
     else:
-        delta_entropy = exact_log_det(jvp, len(x))
+        delta_entropy = exact_log_det(jvp, D)
     x += stepsize * g
     return x, delta_entropy
+
+def gradient_step_track_entropy_vectorized(gradfun, init_xs, stepsize, rs, approx=False):
+    """Takes one gradient step, and returns an estimate of the change in entropy."""
+    xs = init_xs
+    (N, D) = xs.shape
+    gs = gradfun(xs)
+    hvp = elementwise_grad(lambda xs, vect : np.dot(gradfun(xs), vect))  # Hessian-vector product
+    jvp = lambda vect : vect + stepsize * hvp(xs, vect)     # Jacobian-vector product
+    if approx:
+        delta_entropy = approx_log_det(jvp, D, rs)
+    else:
+        delta_entropy = exact_log_det_vectorized(jvp, D, N)
+    xs += stepsize * gs
+    return xs, delta_entropy
 
 def sum_entropy_lower_bound(entropy_a, entropy_b, D):
     """Returns lower bound of X + Y given the entropy of X and Y.
