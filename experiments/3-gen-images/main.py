@@ -128,7 +128,7 @@ if __name__ == '__main__':
 
     sampler_params = np.zeros(len(parser))
     parser.put(sampler_params, 'mean', init_mean)
-    parser.put(sampler_params, 'stddev', init_stddevs)
+    parser.put(sampler_params, 'log_stddev', init_stddevs)
     parser.put(sampler_params, 'log_stepsizes', init_log_stepsizes)
     parser.put(sampler_params, 'log_noise_sizes', init_log_noise_sizes)
 
