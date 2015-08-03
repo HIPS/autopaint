@@ -29,7 +29,7 @@ def exact_log_det(mvp, D):
         mat[:, i] = mvp(eye[:, i])
     return np.log(np.linalg.det(mat))
 
-def gradient_step_track_entropy(gradfun, x, stepsize, rs, approx=False):
+def gradient_step_track_entropy(gradfun, x, stepsize, rs, approx):
     """Takes one gradient step, and returns an estimate of the change in entropy."""
     g = gradfun(x)
     hvp = grad(lambda x, vect : np.dot(gradfun(x), vect)) # Hessian vector product
@@ -47,7 +47,7 @@ def sum_entropy_lower_bound(entropy_a, entropy_b, D):
     https://en.wikipedia.org/wiki/Entropy_power_inequality"""
     return 0.5 * D * np.logaddexp(2.0 * entropy_a / D, 2.0 * entropy_b / D)
 
-def gradient_ascent_entropic(gradfun, entropy, x, stepsizes, noise_sizes, rs, callback, approx=True):
+def gradient_ascent_entropic(gradfun, entropy, x, stepsizes, noise_sizes, rs, callback, approx):
     # assert len(stepsizes) == len(noise_sizes)
     D = len(x)
     num_steps = len(stepsizes)
@@ -78,7 +78,7 @@ def build_langevin_sampler(loglik_func, D, num_steps):
 
     def sample_and_run_langevin(params, rs, callback=None):
         mean = parser.get(params, 'mean')
-        stddev = parser.get(params, 'stddev')
+        stddev = np.exp(parser.get(params, 'stddev'))
         stepsizes = np.exp(parser.get(params, 'log_stepsizes'))
         noise_sizes = np.exp(parser.get(params, 'log_noise_sizes'))
 
