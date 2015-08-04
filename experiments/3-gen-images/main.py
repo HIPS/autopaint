@@ -89,8 +89,8 @@ def plot_sampler_params(params, filename):
 if __name__ == '__main__':
 
     t0 = time.time()
-    num_samples = 40
-    num_langevin_steps = 10
+    num_samples = 4
+    num_langevin_steps = 5
     num_sampler_optimization_steps = 20
     sampler_learn_rate = 0.001
 
@@ -107,7 +107,8 @@ if __name__ == '__main__':
 
     def generative_conditional(labels):
         def cond_like(images):
-            return nn_like(trained_weights,images,labels)+logprob_mvn(all_mean,all_cov,images)
+            # return nn_like(trained_weights,images,labels)+logprob_mvn(all_mean,all_cov,images)
+            return logprob_mvn(all_mean,all_cov,images)
         return cond_like
 
     labels = np.zeros((num_samples,1))
@@ -120,7 +121,7 @@ if __name__ == '__main__':
     # init_mean = np.zeros((1,D))
     init_stddevs = np.log(.00001*np.ones((1,D)))
     init_log_stepsizes = np.log(0.001*np.ones(num_langevin_steps))
-    init_log_noise_sizes = np.log(.0000001*np.ones(num_langevin_steps))
+    init_log_noise_sizes = np.log(.001*np.ones(num_langevin_steps))
 
     rs = np.random.npr.RandomState(0)
 
@@ -160,7 +161,13 @@ if __name__ == '__main__':
         print "log marginal likelihood:", ml
         plot_sampler_params(sampler_params, 'sampler_params.png')
         sampler_params = sampler_params + sampler_learn_rate * dml
-
+        print 'dml norm', np.linalg.norm(dml)
+        print 'dml max', np.max(dml)
+        fig = plt.figure()
+        fig.clf()
+        ax = fig.add_subplot(111)
+        ax.plot(dml[-(2*num_langevin_steps):-1],'o')
+        plt.savefig('dml.png')
 
 
     t1 = time.time()
