@@ -60,7 +60,7 @@ def logprob_mvn(mean,cov,z):
 def plot_sampler_params(params, filename):
 
     mean = parser.get(params, 'mean')
-    stddev = parser.get(params, 'stddev')
+    stddev = parser.get(params, 'log_stddev')
     stepsizes = np.exp(parser.get(params, 'log_stepsizes'))
     noise_sizes = np.exp(parser.get(params, 'log_noise_sizes'))
 
@@ -89,8 +89,8 @@ def plot_sampler_params(params, filename):
 if __name__ == '__main__':
 
     t0 = time.time()
-    num_samples = 10
-    num_langevin_steps = 20
+    num_samples = 40
+    num_langevin_steps = 10
     num_sampler_optimization_steps = 20
     sampler_learn_rate = 0.001
 
@@ -110,7 +110,7 @@ if __name__ == '__main__':
             return nn_like(trained_weights,images,labels)+logprob_mvn(all_mean,all_cov,images)
         return cond_like
 
-    labels = np.zeros((1,num_samples))
+    labels = np.zeros((num_samples,1))
 
     cond_like = generative_conditional(labels)
 
@@ -124,27 +124,33 @@ if __name__ == '__main__':
 
     rs = np.random.npr.RandomState(0)
 
-    sample_and_run_langevin, parser = build_langevin_sampler(cond_like, D, num_langevin_steps)
+    sample_and_run_langevin, parser = build_langevin_sampler(cond_like, D, num_langevin_steps,approx = True)
 
     sampler_params = np.zeros(len(parser))
     parser.put(sampler_params, 'mean', init_mean)
     parser.put(sampler_params, 'log_stddev', init_stddevs)
     parser.put(sampler_params, 'log_stepsizes', init_log_stepsizes)
     parser.put(sampler_params, 'log_noise_sizes', init_log_noise_sizes)
+    #
+    # def get_batch_marginal_likelihood_estimate(sampler_params):
+    #     samples = [] # np.zeros((num_samples, D))
+    #     mls = []
+    #     for s in range(num_samples):
+    #         z, marginal_likelihood_estimate = sample_and_run_langevin(sampler_params, rs)
+    #         samples.append(z.value)
+    #         mls.append(marginal_likelihood_estimate)
+    #
+    #     samples = fast_array_from_list(samples)
+    #     # plot_density(samples, "approximating_dist.png")
+    #     matplotlib.image.imsave("optimizing", samples[0,:].reshape((28,28)))
+    #
+    #     return np.mean(mls)
 
     def get_batch_marginal_likelihood_estimate(sampler_params):
-        samples = [] # np.zeros((num_samples, D))
-        mls = []
-        for s in range(num_samples):
-            z, marginal_likelihood_estimate = sample_and_run_langevin(sampler_params, rs)
-            samples.append(z.value)
-            mls.append(marginal_likelihood_estimate)
+        samples, marginal_likelihood_estimates = sample_and_run_langevin(sampler_params, rs, num_samples)
+        matplotlib.image.imsave("optimizing", (samples[0,:].reshape((28,28))).value)
 
-        samples = fast_array_from_list(samples)
-        # plot_density(samples, "approximating_dist.png")
-        matplotlib.image.imsave("optimizing", samples[0,:].reshape((28,28)))
-
-        return np.mean(mls)
+        return np.mean(marginal_likelihood_estimates)
 
     ml_and_grad = value_and_grad(get_batch_marginal_likelihood_estimate)
 
