@@ -22,7 +22,7 @@ def logprob_two_moons(z):
 def logprob_wiggle(z):
     z1 = z[:, 0]
     z2 = z[:, 1]
-    return -0.5 * (z2 - np.sin(2.0 * np.pi * z1 / 4.0) / 0.4 )**2 + 0.2 * (z1**2 + z2**2)
+    return -0.5 * (z2 - np.sin(2.0 * np.pi * z1 / 4.0) / 0.4 )**2 - 0.2 * (z1**2 + z2**2)
 
 cov = np.array([[1.0, 0.9], [0.9, 1.0]])
 pinv = np.linalg.pinv(cov)
@@ -66,9 +66,9 @@ if __name__ == '__main__':
 
     t0 = time.time()
 
-    num_samples = 100
+    num_samples = 200
     num_langevin_steps = 5
-    num_sampler_optimization_steps = 40
+    num_sampler_optimization_steps = 200
     sampler_learn_rate = 0.2
 
     D = 2
@@ -79,7 +79,7 @@ if __name__ == '__main__':
 
     rs = np.random.npr.RandomState(0)
 
-    sample_and_run_langevin, parser = build_langevin_sampler(logprob_two_moons, D, num_langevin_steps, approx=True)
+    sample_and_run_langevin, parser = build_langevin_sampler(logprob_two_moons, D, num_langevin_steps, approx=False)
 
     sampler_params = np.zeros(len(parser))
     parser.put(sampler_params, 'mean', init_mean)
