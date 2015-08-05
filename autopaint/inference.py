@@ -5,13 +5,11 @@ from .util import WeightsParser, fast_array_from_list
 
 
 def entropy_of_a_gaussian(stddevs):
-    # TODO: double check this formula.
     D = len(stddevs)
-    return 0.05 * D * (1 + np.log(2*np.pi)) + np.sum(np.log(stddevs))
+    return 0.5 * D * (1 + np.log(2*np.pi)) + np.sum(np.log(stddevs))
 
 def entropy_of_a_spherical_gaussian(stddev, D):
-    # TODO: double check this formula.
-    return 0.05 * D * (1 + np.log(2*np.pi)) + D * np.log(stddev)
+    return 0.5 * D * (1 + np.log(2*np.pi)) + D * np.log(stddev)
 
 def approx_log_det(mvp, D, rs):
     # This should be an unbiased estimator of a lower bound on the log determinant
@@ -46,7 +44,7 @@ def exact_log_det(jvp, D):
     jac = np.zeros((D, D))
     eye = np.eye(D)
     for i in xrange(D):
-     jac[:, i] = jvp(eye[:, i])
+        jac[:, i] = jvp(eye[:, i])
     sign, logdet = np.linalg.slogdet(jac)
     return logdet
 
@@ -86,10 +84,10 @@ def gradient_step_track_entropy(gradfun, x, stepsize, rs, approx=False):
 def gradient_step_track_entropy_vectorized(gradfun, xs, stepsize, rs, approx):
     """Takes one gradient step, and returns an estimate of the change in entropy."""
     (N, D) = xs.shape
-    gs = gradfun(xs)
+    gradients = gradfun(xs)
 
-    # hvp of log-likelihood function.  Would use np.dot(gradfun(xs), vect)),
-    # but we want to do this in parallel.
+    # Hessian-vector product of log-likelihood function.
+    # Would use np.dot(gradfun(xs), vect)), but we want to do this in parallel.
     hvp = elementwise_grad(lambda xs, vect : np.sum(gradfun(xs) * vect, axis=1))
 
     def jacobian_vector_product(vect):
@@ -100,7 +98,7 @@ def gradient_step_track_entropy_vectorized(gradfun, xs, stepsize, rs, approx):
         delta_entropy = approx_log_det_vectorized(jacobian_vector_product, D, N, rs=rs)
     else:
         delta_entropy = exact_log_det_vectorized(jacobian_vector_product, D, N)
-    xs += stepsize * gs
+    xs += stepsize * gradients
     return xs, delta_entropy
 
 
@@ -125,7 +123,7 @@ def gradient_ascent_entropic(gradfun, entropies, xs, stepsizes, noise_sizes, rs,
         # Update entropy estimate.
         entropies += delta_entropy
         noise_entropies = entropy_of_a_spherical_gaussian(noise_sizes[t], D)
-        entropy = sum_entropy_lower_bound(entropies, noise_entropies, D)
+        entropies = sum_entropy_lower_bound(entropies, noise_entropies, D)
 
     return xs, entropies
 
@@ -150,12 +148,12 @@ def build_langevin_sampler(loglik_func, D, num_steps, approx):
         initial_entropies = np.full(num_samples, entropy_of_a_gaussian(stddev))
         init_xs = mean + rs.randn(num_samples, D) * stddev
 
-        samples, final_entropies = gradient_ascent_entropic(gradfun, entropies=initial_entropies, xs=init_xs,
+        samples, entropy_estimates = gradient_ascent_entropic(gradfun, entropies=initial_entropies, xs=init_xs,
                                                             stepsizes=stepsizes, noise_sizes=noise_sizes,
                                                             rs=rs, callback=callback, approx=approx)
         loglik_estimates = loglik_func(samples)
-        marginal_likelihood_estimates = loglik_estimates + final_entropies
-        return samples, marginal_likelihood_estimates
+        #marginal_likelihood_estimates = loglik_estimates + final_entropies
+        return samples, loglik_estimates, entropy_estimates
 
     return sample_and_run_langevin, parser
 
