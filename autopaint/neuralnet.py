@@ -30,6 +30,9 @@ def make_nn_funs(layer_sizes, L2_reg):
         for W, b in unpack_layers(W_vect):
             outputs = np.dot(inputs, W) + b
             inputs = np.tanh(outputs)
+
+        #TODO: Less hacky, what if it's already the right shape?
+        outputs = np.reshape(outputs,(1,len(outputs)))
         return outputs - logsumexp(outputs, axis=1, keepdims=True)
 
     def loss(W_vect, X, T):
@@ -37,10 +40,13 @@ def make_nn_funs(layer_sizes, L2_reg):
         log_lik = np.sum(predict_fun(W_vect, X) * T)
         return - log_prior - log_lik
 
+    def likelihood(W_vect, X, T):
+        return -1*loss(W_vect,X,T)
+
     def frac_err(W_vect, X, T):
         return np.mean(np.argmax(T, axis=1) != np.argmax(predict_fun(W_vect, X), axis=1))
 
-    return N, predict_fun, loss, frac_err
+    return N, predict_fun, loss, frac_err, likelihood
 
 
 def load_mnist():
@@ -81,7 +87,7 @@ def sgd(grad, x, callback=None, num_iters=200, step_size=0.1, mass=0.9):
 def train_nn(train_images, train_labels, test_images, test_labels):
 
     # Make neural net functions
-    N_weights, predict_fun, loss_fun, frac_err = make_nn_funs(layer_sizes, L2_reg)
+    N_weights, predict_fun, loss_fun, frac_err, likelihood = make_nn_funs(layer_sizes, L2_reg)
     loss_grad = grad(loss_fun)
 
     # Initialize weights
@@ -109,6 +115,6 @@ def train_nn(train_images, train_labels, test_images, test_labels):
             cur_dir = momentum * cur_dir + (1.0 - momentum) * grad_W
             weights -= learning_rate * cur_dir
 
-    return weights
+    return weights, predict_fun, likelihood
 
 
