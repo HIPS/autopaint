@@ -52,23 +52,28 @@ if __name__ == '__main__':
 
     t0 = time.time()
 
-    num_samples = 15
-    num_langevin_steps = 1
-    num_sampler_optimization_steps = 20
+    num_samples = 20
+    num_langevin_steps = 10
+    num_sampler_optimization_steps = 100
     sampler_learn_rate = 0.001
 
     layer_sizes = [784, 200, 100, 10]
     L2_reg = 1.0
     D = 784
 
-    init_init_stddev_scale = 0.0001
-    init_langevin_stepsize = 0.0001
-    init_langevin_noise_size = 0.0001
+    init_init_stddev_scale = 0.000001
+    init_langevin_stepsize = 0.01
+    init_langevin_noise_size = 0.000001
+
+    prior_relax = 0.01
 
     # train_mnist_model()   # Comment after running once.
 
     with open('mnist_models.pkl') as f:
         trained_weights, all_mean, all_cov = pickle.load(f)
+
+    # Regularize all_cov
+    all_cov = all_cov + prior_relax * np.eye(D)
 
     N_weights, predict_fun, loss_fun, frac_err, nn_like = make_nn_funs(layer_sizes, L2_reg)
 
@@ -102,6 +107,7 @@ if __name__ == '__main__':
         samples, likelihood_estimates, entropy_estimates = sample_and_run_langevin(sampler_params, rs, num_samples)
         #matplotlib.image.imsave("optimizing", (samples[0,:].reshape((28,28))).value)
         #marginal_likelihood_estimates
+        print "mean loglik:", np.mean(likelihood_estimates), " mean entropy:", np.mean(entropy_estimates)
         fig = plt.figure(1)
         fig.clf()
         ax = fig.add_subplot(111)
