@@ -127,7 +127,12 @@ def build_logprob_mvn(mean, cov):
         return const - 0.5 * np.einsum('ij,jk,ik->i', z_minus_mean, pinv, z_minus_mean)
     return logprob_mvn
 
-def entropy_of_a_gaussian(stddevs):
+def entropy_of_a_gaussian(cov):
+    D = cov.shape[0]
+    sign, logdet = np.slogdet(cov)
+    return 0.5 * D * (1.0 + np.log(2*np.pi)) + 0.5 * logdet
+
+def entropy_of_a_diagonal_gaussian(stddevs):
     D = len(stddevs)
     return 0.5 * D * (1.0 + np.log(2*np.pi)) + np.sum(np.log(stddevs))
 
