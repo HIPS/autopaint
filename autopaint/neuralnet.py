@@ -30,9 +30,6 @@ def make_nn_funs(layer_sizes, L2_reg):
         for W, b in unpack_layers(W_vect):
             outputs = np.dot(inputs, W) + b
             inputs = np.tanh(outputs)
-
-        #TODO: Less hacky, what if it's already the right shape?
-        outputs = np.reshape(outputs,(1,len(outputs)))
         return outputs - logsumexp(outputs, axis=1, keepdims=True)
 
     def loss(W_vect, X, T):
@@ -41,19 +38,20 @@ def make_nn_funs(layer_sizes, L2_reg):
         return - log_prior - log_lik
 
     def likelihood(W_vect, X, T):
-        return -1*loss(W_vect,X,T)
+        return -loss(W_vect, X, T)
 
     def frac_err(W_vect, X, T):
         return np.mean(np.argmax(T, axis=1) != np.argmax(predict_fun(W_vect, X), axis=1))
 
     return N, predict_fun, loss, frac_err, likelihood
 
+one_hot = lambda x, K: np.array(x[:,None] == np.arange(K)[None, :], dtype=int)
 
 def load_mnist():
     print "Loading training data..."
     import imp, urllib
     partial_flatten = lambda x : np.reshape(x, (x.shape[0], np.prod(x.shape[1:])))
-    one_hot = lambda x, K: np.array(x[:,None] == np.arange(K)[None, :], dtype=int)
+
     source, _ = urllib.urlretrieve(
         'https://raw.githubusercontent.com/HIPS/Kayak/master/examples/data.py')
     data = imp.load_source('data', source).mnist()

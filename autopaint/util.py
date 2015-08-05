@@ -119,11 +119,13 @@ def log_normalizing_constant_of_a_guassian(cov):
     (sign, logdet) = np.linalg.slogdet(cov)
     return -0.5 * D * np.log(2*np.pi) - 0.5 * logdet
 
-cov = np.array([[1.0, 0.9], [0.9, 1.0]])
-pinv = np.linalg.pinv(cov)
-const = log_normalizing_constant_of_a_guassian(cov)
-def logprob_mvn(z):
-    return const - 0.5 * np.einsum('ij,jk,ik->i', z, pinv, z)
+def build_logprob_mvn(mean, cov):
+    pinv = np.linalg.pinv(cov)
+    const = log_normalizing_constant_of_a_guassian(cov)
+    def logprob_mvn(z):
+        z_minus_mean = z - mean
+        return const - 0.5 * np.einsum('ij,jk,ik->i', z_minus_mean, pinv, z_minus_mean)
+    return logprob_mvn
 
 def entropy_of_a_gaussian(stddevs):
     D = len(stddevs)
