@@ -12,24 +12,7 @@ import matplotlib.pyplot as plt
 
 from autopaint.plotting import *
 from autopaint.inference import build_langevin_sampler
-
-def logprob_two_moons(z):
-    z1 = z[:, 0]
-    z2 = z[:, 1]
-    return (- 0.5 * ((np.sqrt(z1**2 + z2**2) - 2 ) / 0.4)**2\
-            + np.logaddexp(-0.5 * ((z1 - 2) / 0.6)**2, -0.5 * ((z1 + 2) / 0.6)**2))
-
-def logprob_wiggle(z):
-    z1 = z[:, 0]
-    z2 = z[:, 1]
-    return -0.5 * (z2 - np.sin(2.0 * np.pi * z1 / 4.0) / 0.4 )**2 - 0.2 * (z1**2 + z2**2)
-
-cov = np.array([[1.0, 0.0], [0.0, 1.0]])
-pinv = np.linalg.inv(cov)
-(sign, logdet) = numpy.linalg.slogdet(cov)
-const =  -0.5 * 2 * np.log(2*np.pi) - 0.5 * logdet
-def logprob_mvn(z):
-    return const - 0.5 * np.dot(np.dot(z, pinv), z.T)
+from autopaint.util import logprob_mvn
 
 def plot_sampler_params(params, filename):
 
@@ -59,6 +42,7 @@ def plot_sampler_params(params, filename):
     ax.set_ylabel('noise_sizes', fontproperties='serif')
     ax.set_xlabel('Langevin iterations', fontproperties='serif')
 
+    fig.subplots_adjust(hspace=.5)
     plt.savefig(filename)
 
 
@@ -66,16 +50,16 @@ if __name__ == '__main__':
 
     t0 = time.time()
 
-    num_samples = 200
-    num_langevin_steps =0
+    num_samples = 2000
+    num_langevin_steps = 3
     num_sampler_optimization_steps = 200
     sampler_learn_rate = 0.2
 
     D = 2
     init_mean = np.zeros(D)
-    init_log_stddevs = np.log(1*np.ones(D))
-    init_log_stepsizes = np.log(0.01*np.ones(num_langevin_steps))
-    init_log_noise_sizes = np.log(.001*np.ones(num_langevin_steps))
+    init_log_stddevs = np.log(1.0*np.ones(D))
+    init_log_stepsizes = np.log(0.1*np.ones(num_langevin_steps))
+    init_log_noise_sizes = np.log(0.1*np.ones(num_langevin_steps))
 
     rs = np.random.npr.RandomState(0)
 

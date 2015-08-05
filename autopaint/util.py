@@ -99,3 +99,35 @@ def sample_from_gaussian_model(images, prefix):
 
 def fast_array_from_list(xs):
     return np.concatenate([np.expand_dims(x, axis=0) for x in xs], axis=0)
+
+
+# Some example test likelihood functions
+
+def logprob_two_moons(z):
+    z1 = z[:, 0]
+    z2 = z[:, 1]
+    return (- 0.5 * ((np.sqrt(z1**2 + z2**2) - 2 ) / 0.4)**2\
+            + np.logaddexp(-0.5 * ((z1 - 2) / 0.6)**2, -0.5 * ((z1 + 2) / 0.6)**2))
+
+def logprob_wiggle(z):
+    z1 = z[:, 0]
+    z2 = z[:, 1]
+    return -0.5 * (z2 - np.sin(2.0 * np.pi * z1 / 4.0) / 0.4 )**2 - 0.2 * (z1**2 + z2**2)
+
+def log_normalizing_constant_of_a_guassian(cov):
+    D = cov.shape[0]
+    (sign, logdet) = np.linalg.slogdet(cov)
+    return -0.5 * D * np.log(2*np.pi) - 0.5 * logdet
+
+cov = np.array([[1.0, 0.9], [0.9, 1.0]])
+pinv = np.linalg.pinv(cov)
+const = log_normalizing_constant_of_a_guassian(cov)
+def logprob_mvn(z):
+    return const - 0.5 * np.einsum('ij,jk,ik->i', z, pinv, z)
+
+def entropy_of_a_gaussian(stddevs):
+    D = len(stddevs)
+    return 0.5 * D * (1.0 + np.log(2*np.pi)) + np.sum(np.log(stddevs))
+
+def entropy_of_a_spherical_gaussian(stddev, D):
+    return 0.5 * D * (1.0 + np.log(2*np.pi)) + D * np.log(stddev)

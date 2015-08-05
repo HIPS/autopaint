@@ -1,15 +1,8 @@
 import autograd.numpy as np
 from autograd import grad, elementwise_grad
 
-from .util import WeightsParser, fast_array_from_list
-
-
-def entropy_of_a_gaussian(stddevs):
-    D = len(stddevs)
-    return 0.5 * D * (1 + np.log(2*np.pi)) + np.sum(np.log(stddevs))
-
-def entropy_of_a_spherical_gaussian(stddev, D):
-    return 0.5 * D * (1 + np.log(2*np.pi)) + D * np.log(stddev)
+from .util import WeightsParser, fast_array_from_list,\
+    entropy_of_a_gaussian, entropy_of_a_spherical_gaussian
 
 def approx_log_det(mvp, D, rs):
     # This should be an unbiased estimator of a lower bound on the log determinant
@@ -101,13 +94,11 @@ def gradient_step_track_entropy_vectorized(gradfun, xs, stepsize, rs, approx):
     xs += stepsize * gradients
     return xs, delta_entropy
 
-
 def sum_entropy_lower_bound(entropy_a, entropy_b, D):
     """Returns lower bound of X + Y given the entropy of X and Y.
     Uses the entropy power inequality.
     https://en.wikipedia.org/wiki/Entropy_power_inequality"""
     return 0.5 * D * np.logaddexp(2.0 * entropy_a / D, 2.0 * entropy_b / D)
-
 
 def gradient_ascent_entropic(gradfun, entropies, xs, stepsizes, noise_sizes, rs, callback, approx):
     assert len(stepsizes) == len(noise_sizes)
@@ -141,18 +132,18 @@ def build_langevin_sampler(loglik_func, D, num_steps, approx):
 
     def sample_and_run_langevin(params, rs, num_samples, callback=None):
         mean = parser.get(params, 'mean')
-        stddev = np.exp(parser.get(params, 'log_stddev'))
+        stddevs = np.exp(parser.get(params, 'log_stddev'))
         stepsizes = np.exp(parser.get(params, 'log_stepsizes'))
         noise_sizes = np.exp(parser.get(params, 'log_noise_sizes'))
 
-        initial_entropies = np.full(num_samples, entropy_of_a_gaussian(stddev))
-        init_xs = mean + rs.randn(num_samples, D) * stddev
+        initial_entropies = np.full(num_samples, entropy_of_a_gaussian(stddevs))
+        init_xs = mean + rs.randn(num_samples, D) * stddevs
 
         samples, entropy_estimates = gradient_ascent_entropic(gradfun, entropies=initial_entropies, xs=init_xs,
                                                             stepsizes=stepsizes, noise_sizes=noise_sizes,
                                                             rs=rs, callback=callback, approx=approx)
+
         loglik_estimates = loglik_func(samples)
-        #marginal_likelihood_estimates = loglik_estimates + final_entropies
         return samples, loglik_estimates, entropy_estimates
 
     return sample_and_run_langevin, parser
