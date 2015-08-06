@@ -129,7 +129,7 @@ def build_logprob_mvn(mean, cov):
 
 def entropy_of_a_gaussian(cov):
     D = cov.shape[0]
-    sign, logdet = np.slogdet(cov)
+    sign, logdet = np.linalg.slogdet(cov)
     return 0.5 * D * (1.0 + np.log(2*np.pi)) + 0.5 * logdet
 
 def entropy_of_a_diagonal_gaussian(stddevs):

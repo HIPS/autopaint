@@ -54,18 +54,18 @@ if __name__ == '__main__':
 
     num_samples = 20
     num_langevin_steps = 10
-    num_sampler_optimization_steps = 100
+    num_sampler_optimization_steps = 300
     sampler_learn_rate = 0.001
 
     layer_sizes = [784, 200, 100, 10]
     L2_reg = 1.0
     D = 784
 
-    init_init_stddev_scale = 0.000001
+    init_init_stddev_scale = 0.00001
     init_langevin_stepsize = 0.01
-    init_langevin_noise_size = 0.000001
+    init_langevin_noise_size = 0.00001
 
-    prior_relax = 0.01
+    prior_relax = 0.001
 
     # train_mnist_model()   # Comment after running once.
 

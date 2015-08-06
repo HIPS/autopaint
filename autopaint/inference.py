@@ -2,7 +2,7 @@ import autograd.numpy as np
 from autograd import grad, elementwise_grad
 
 from .util import WeightsParser, fast_array_from_list,\
-    entropy_of_a_gaussian, entropy_of_a_spherical_gaussian
+    entropy_of_a_diagonal_gaussian, entropy_of_a_spherical_gaussian
 
 def approx_log_det(mvp, D, rs):
     # This should be an unbiased estimator of a lower bound on the log determinant
@@ -136,7 +136,7 @@ def build_langevin_sampler(loglik_func, D, num_steps, approx):
         stepsizes = np.exp(parser.get(params, 'log_stepsizes'))
         noise_sizes = np.exp(parser.get(params, 'log_noise_sizes'))
 
-        initial_entropies = np.full(num_samples, entropy_of_a_gaussian(stddevs))
+        initial_entropies = np.full(num_samples, entropy_of_a_diagonal_gaussian(stddevs))
         init_xs = mean + rs.randn(num_samples, D) * stddevs
 
         samples, entropy_estimates = gradient_ascent_entropic(gradfun, entropies=initial_entropies, xs=init_xs,
