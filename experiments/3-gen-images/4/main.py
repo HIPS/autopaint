@@ -53,21 +53,21 @@ if __name__ == '__main__':
 
     t0 = time.time()
 
-    num_samples = 200
-    num_langevin_steps = 3
-    num_sampler_optimization_steps = 300
-    sampler_learn_rate = 0.000001
-    images_per_row = 20
+    num_samples = 50
+    num_langevin_steps = 5
+    num_sampler_optimization_steps = 100
+    sampler_learn_rate = 0.0001
+    images_per_row = 10
 
     layer_sizes = [784, 200, 100, 10]
     L2_reg = 1.0
     D = 784
 
-    init_init_stddev_scale = 0.01
-    init_langevin_stepsize = 0.001
+    init_init_stddev_scale = 0.1
+    init_langevin_stepsize = 0.0005
     init_langevin_noise_size = 0.00001
 
-    prior_relax = 0.01
+    prior_relax = 0.1
 
     # train_mnist_model()   # Comment after running once.
 
@@ -79,14 +79,17 @@ if __name__ == '__main__':
 
     N_weights, predict_fun, loss_fun, frac_err, nn_loglik = make_nn_funs(layer_sizes, L2_reg)
 
+    sigmoid = lambda x: 0.5 * (np.tanh(x) + 1)
+
     #prior_func = build_logprob_mvn(all_mean, all_cov)
     prior_func = build_logprob_standard_normal(D)
     unwhiten = build_unwhitener(all_mean, all_cov)
     def nn_likelihood(images, labels):
         prior = prior_func(images)
         unwhitened_images = unwhiten(images)
-        likelihood = nn_loglik(trained_weights, unwhitened_images, labels)
-        return likelihood #prior + likelihood
+        squashed_images = sigmoid(unwhitened_images)
+        likelihood = nn_loglik(trained_weights, squashed_images, labels)
+        return prior + likelihood
 
     gen_labels = one_hot(np.array([i % 10 for i in range(num_samples)]), 10)
     labeled_likelihood = lambda images: nn_likelihood(images, gen_labels)
@@ -124,7 +127,7 @@ if __name__ == '__main__':
     # Optimize Langevin parameters.
     for i in xrange(num_sampler_optimization_steps):
         ml, dml = ml_and_grad(sampler_params)
-        print "iter:", i, "log marginal likelihood:", ml
+        print "iter:", i, "log marginal likelihood:", ml, "avg gradient magnitude: ", np.mean(np.abs(dml))
         plot_sampler_params(sampler_params, unwhiten, 'params')
         plot_sampler_params(dml, unwhiten, 'param_grads')
 

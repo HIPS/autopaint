@@ -153,3 +153,10 @@ def entropy_of_a_diagonal_gaussian(stddevs):
 
 def entropy_of_a_spherical_gaussian(stddev, D):
     return 0.5 * D * (1.0 + np.log(2*np.pi)) + D * np.log(stddev)
+
+def low_variance_gradient_estimator(grad_entropies, grad_likelihoods):
+    """Produces a lower-variance estimate of the gradient w.r.t. the variational lower bound
+        by exploiting the fact that E_q(gradient of log(q)) = 0 for any q.
+        From eqn (8) of http://arxiv.org/pdf/1401.1022v3.pdf"""
+    empirical_entropy_grad_mean = np.mean(grad_entropies)
+    return np.mean((grad_entropies - empirical_entropy_grad_mean)*(grad_entropies + grad_likelihoods))
