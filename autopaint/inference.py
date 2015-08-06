@@ -2,7 +2,7 @@ import autograd.numpy as np
 from autograd import grad, elementwise_grad
 
 from .util import WeightsParser, fast_array_from_list,\
-    entropy_of_a_gaussian, entropy_of_a_spherical_gaussian
+    entropy_of_a_gaussian, entropy_of_a_spherical_gaussian,entropy_of_a_diagonal_gaussian
 
 def approx_log_det(mvp, D, rs):
     # This should be an unbiased estimator of a lower bound on the log determinant
@@ -100,7 +100,7 @@ def sum_entropy_lower_bound(entropy_a, entropy_b, D):
     https://en.wikipedia.org/wiki/Entropy_power_inequality"""
     return 0.5 * D * np.logaddexp(2.0 * entropy_a / D, 2.0 * entropy_b / D)
 
-def gradient_ascent_entropic(gradfun, entropies, xs, stepsizes, noise_sizes, rs, callback, approx):
+def gradient_ascent_entropic(gradfun, entropies, xs, stepsizes, noise_sizes, rs, callback, approx,cov):
     assert len(stepsizes) == len(noise_sizes)
     (N, D) = xs.shape
     num_steps = len(stepsizes)
@@ -108,18 +108,20 @@ def gradient_ascent_entropic(gradfun, entropies, xs, stepsizes, noise_sizes, rs,
     for t in xrange(num_steps):
         if callback: callback(xs=xs, t=t, entropy=delta_entropy)
         xs, delta_entropy = gradient_step_track_entropy_vectorized(gradfun, xs, stepsizes[t], rs, approx=approx)
-        noise = rs.randn(N, D) * noise_sizes[t]
+        # noise = rs.randn(N, D) * noise_sizes[t]
+        m = np.zeros(D)
+        noise = noise_sizes[t]* np.random.multivariate_normal(m,cov,N)
         xs = xs + noise
 
         # Update entropy estimate.
         entropies += delta_entropy
-        noise_entropies = entropy_of_a_spherical_gaussian(noise_sizes[t], D)
+        noise_entropies = entropy_of_a_gaussian(noise_sizes[t]*cov)
         entropies = sum_entropy_lower_bound(entropies, noise_entropies, D)
 
     return xs, entropies
 
 
-def build_langevin_sampler(loglik_func, D, num_steps, approx):
+def build_langevin_sampler(loglik_func, D, num_steps, approx,cov):
 
     # Build parser
     parser = WeightsParser()
@@ -136,12 +138,12 @@ def build_langevin_sampler(loglik_func, D, num_steps, approx):
         stepsizes = np.exp(parser.get(params, 'log_stepsizes'))
         noise_sizes = np.exp(parser.get(params, 'log_noise_sizes'))
 
-        initial_entropies = np.full(num_samples, entropy_of_a_gaussian(stddevs))
-        init_xs = mean + rs.randn(num_samples, D) * stddevs
-
+        initial_entropies = np.full(num_samples, entropy_of_a_gaussian(cov))
+        # init_xs = mean + np.rs.randn(num_samples, D) * stddevs
+        init_xs = mean + np.random.multivariate_normal(np.zeros(D),cov,num_samples )     * stddevs
         samples, entropy_estimates = gradient_ascent_entropic(gradfun, entropies=initial_entropies, xs=init_xs,
                                                             stepsizes=stepsizes, noise_sizes=noise_sizes,
-                                                            rs=rs, callback=callback, approx=approx)
+                                                            rs=rs, callback=callback, approx=approx,cov = cov)
 
         loglik_estimates = loglik_func(samples)
         return samples, loglik_estimates, entropy_estimates
