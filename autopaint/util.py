@@ -1,5 +1,5 @@
 import autograd.numpy as np
-
+import scipy.linalg
 
 class WeightsParser(object):
     """A helper class to index into a parameter vector."""
@@ -126,6 +126,21 @@ def build_logprob_mvn(mean, cov):
         z_minus_mean = z - mean
         return const - 0.5 * np.einsum('ij,jk,ik->i', z_minus_mean, pinv, z_minus_mean)
     return logprob_mvn
+
+def build_logprob_standard_normal(D):
+    const = log_normalizing_constant_of_a_guassian(np.eye(D))
+    def logprob(z):
+        return const - 0.5 * np.einsum('ij,ij->i', z, z)
+    return logprob
+
+def build_unwhitener(mean, cov):
+    """Builds a function that takes in a draw from a standard normal, and
+       turns it into a draw from a MVN with mean, cov."""
+    #chol = np.linalg.cholesky(cov)
+    sq = np.real(scipy.linalg.sqrtm(cov))
+    def unwhitener(z):
+        return np.dot(z, sq) + mean
+    return unwhitener
 
 def entropy_of_a_gaussian(cov):
     D = cov.shape[0]
