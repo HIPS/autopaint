@@ -2,10 +2,10 @@ import autograd.numpy as np
 import autograd.numpy.random as npr
 
 from autopaint.util import fast_array_from_list
-from autopaint.inference import exact_log_det, exact_log_det_vectorized, approx_log_det,\
-    gradient_step_track_entropy_vectorized, gradient_step_track_entropy, approx_log_det_vectorized,\
+from autopaint.inference import exact_log_det_non_vectorized, exact_log_det, approx_log_det_non_vectorized,\
+    gradient_step_track_entropy_non_vectorized, gradient_step_track_entropy, approx_log_det,\
     build_langevin_sampler, sum_entropy_lower_bound
-from autopaint.util import logprob_two_moons, logprob_mvn
+from autopaint.util import logprob_two_moons, build_logprob_mvn, build_logprob_standard_normal
 
 from autograd import grad, elementwise_grad
 from autograd.util import quick_grad_check, check_grads
@@ -15,7 +15,7 @@ def test_exact_log_det():
     rs = npr.RandomState(0)
     mat = np.eye(D) - 0.1 * np.diag(rs.rand(D))
     mvp = lambda v : np.dot(mat, v)
-    assert exact_log_det(mvp, D) == np.log(np.linalg.det(mat))
+    assert exact_log_det_non_vectorized(mvp, D) == np.log(np.linalg.det(mat))
 
 def test_exact_log_det_vectorized():
     D = 10
@@ -28,7 +28,7 @@ def test_exact_log_det_vectorized():
         cur_mat = np.eye(D) - 0.1 * np.diag(rs.rand(D))
         mats.append(cur_mat)
         cur_func = lambda v : np.dot(cur_mat, v)
-        exact_logdets.append(exact_log_det(cur_func, D))
+        exact_logdets.append(exact_log_det_non_vectorized(cur_func, D))
 
     def mvp_vec(v):
         """Vectorized version takes in N vectors of length D, and multiples
@@ -39,7 +39,7 @@ def test_exact_log_det_vectorized():
             print "i:", i, v[i]
             mvps.append(np.dot(mats[i], v[i]))
         return fast_array_from_list(mvps)
-    vec_logdets = exact_log_det_vectorized(mvp_vec, D, N)
+    vec_logdets = exact_log_det(mvp_vec, D, N)
 
     assert np.all(vec_logdets == exact_logdets),\
         "vectorized: {} non-vectorized: {}".format(vec_logdets, exact_logdets)
@@ -56,7 +56,7 @@ def test_approx_log_det_vectorized():
         cur_mat = np.eye(D) - 0.1 * np.diag(rs.rand(D))
         mats.append(cur_mat)
         cur_func = lambda v : np.dot(cur_mat, v.T)
-        alds.append(approx_log_det(cur_func, D, rs=rs2))
+        alds.append(approx_log_det_non_vectorized(cur_func, D, rs=rs2))
     alds = np.array(alds)
 
     def mvp_vec(v):
@@ -71,7 +71,7 @@ def test_approx_log_det_vectorized():
         assert retval.shape == (N,D), retval.shape
         return fast_array_from_list(mvps)
 
-    vec_logdets = approx_log_det_vectorized(mvp_vec, D, N, rs=npr.RandomState(0))
+    vec_logdets = approx_log_det(mvp_vec, D, N, rs=npr.RandomState(0))
 
     assert np.all(vec_logdets - alds < 0.0001), "vectorized: {} non-vectorized: {}, diff: {}".format(vec_logdets, alds, vec_logdets - alds)
 
@@ -92,11 +92,11 @@ def test_entropy_bound_vectorized_vs_not():
     new_es = []
     for i in xrange(N):
         cur_x = np.reshape(xs[i], (1, D))
-        cur_new_x, cur_new_e = gradient_step_track_entropy(gradfun, x=cur_x.copy(), stepsize=stepsize, rs=None, approx=approx)
+        cur_new_x, cur_new_e = gradient_step_track_entropy_non_vectorized(gradfun, x=cur_x.copy(), stepsize=stepsize, rs=None, approx=approx)
         new_xs.append(cur_new_x)
         new_es.append(cur_new_e)
 
-    vec_new_xs, vec_new_es = gradient_step_track_entropy_vectorized(gradfun_vec, xs=xs.copy(), stepsize=stepsize, rs=None, approx=approx)
+    vec_new_xs, vec_new_es = gradient_step_track_entropy(gradfun_vec, xs=xs.copy(), stepsize=stepsize, rs=None, approx=approx)
 
     for i in xrange(N):
         assert np.all(vec_new_xs[i] == new_xs[i]), "vectorized: {} non-vectorized: {}".format(vec_new_xs[i], new_xs[i])
@@ -111,9 +111,9 @@ def test_approx_log_det():
     N_trials = 10000
     approx = 0
     for i in xrange(N_trials):
-        approx += approx_log_det(mvp, D, rs)
+        approx += approx_log_det_non_vectorized(mvp, D, rs)
     approx = approx / N_trials
-    exact = exact_log_det(mvp, D)
+    exact = exact_log_det_non_vectorized(mvp, D)
     assert exact > approx > (exact - 0.1 * np.abs(exact))
     print exact, approx
 
@@ -162,7 +162,7 @@ def test_meta_gradient_with_langevin_mvn():
     init_log_stepsizes = np.log(0.01*np.ones(num_langevin_steps)) + npr.randn(num_langevin_steps) * 0.01
     init_log_noise_sizes = np.log(.001*np.ones(num_langevin_steps)) + npr.randn(num_langevin_steps) * 0.01
 
-    sample_and_run_langevin, parser = build_langevin_sampler(logprob_mvn, D, num_langevin_steps, approx=False)
+    sample_and_run_langevin, parser = build_langevin_sampler(logprob_two_moons, D, num_langevin_steps, approx=False)
 
     sampler_params = np.zeros(len(parser))
     parser.put(sampler_params, 'mean', init_mean)
@@ -180,4 +180,14 @@ def test_meta_gradient_with_langevin_mvn():
 
 
 def test_entropy_lower_bound():
-    assert sum_entropy_lower_bound(1.0, 0.0) == 1.0
+    assert sum_entropy_lower_bound(1.0, 1.0, 1) > 1.0
+
+
+def test_spherical_mvn():
+    D = 10
+    mean = npr.randn(D)
+    mvn1 = build_logprob_mvn(mean, np.eye(D))
+    mvn2 = build_logprob_standard_normal(D)
+    points = npr.randn(4, D)
+    assert np.all(np.abs(mvn1(points) - mvn2(points) < 0.001)),\
+        "mvn1: {}, mvn2: {}".format(mvn1(points), mvn2(points))

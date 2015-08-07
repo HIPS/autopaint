@@ -2,10 +2,10 @@ import autograd.numpy as np
 from autograd import grad, elementwise_grad
 
 from .util import WeightsParser, fast_array_from_list,\
-    entropy_of_a_gaussian, entropy_of_a_diagonal_gaussian, entropy_of_a_spherical_gaussian
+    entropy_of_a_diagonal_gaussian, entropy_of_a_spherical_gaussian
 
 
-def approx_log_det(mvp, D, rs):
+def approx_log_det_non_vectorized(mvp, D, rs):
     # This should be an unbiased estimator of a lower bound on the log determinant
     # provided the eigenvalues are all greater than 0.317 (solution of
     # log(x) = (x - 1) - (x - 1)**2 = -2 + 3 * x - x**2
@@ -14,7 +14,7 @@ def approx_log_det(mvp, D, rs):
     R2 = mvp(R1)
     return np.dot(R0, -2 * R0 + 3 * R1 - R2)
 
-def approx_log_det_vectorized(mvp_vec, D, N, rs):
+def approx_log_det(mvp_vec, D, N, rs):
     # This should be an unbiased estimator of a lower bound on the log determinant
     # provided the eigenvalues are all greater than 0.317 (solution of
     # log(x) = (x - 1) - (x - 1)**2 = -2 + 3 * x - x**2
@@ -26,13 +26,14 @@ def approx_log_det_vectorized(mvp_vec, D, N, rs):
 
 
 def approx_log_det_vectorized_avg(mvp_vec, D, N, num_samples, rs):
+    """Averages over several random projections."""
     # Can this be vectorized more directly, without a for loop?
-    approx_logdets = [approx_log_det_vectorized(mvp_vec, D, N, rs) for n in xrange(num_samples)]
+    approx_logdets = [approx_log_det(mvp_vec, D, N, rs) for n in xrange(num_samples)]
     approx_logdets = fast_array_from_list(approx_logdets)
     return np.mean(approx_logdets, axis=0)
 
 
-def exact_log_det(jvp, D):
+def exact_log_det_non_vectorized(jvp, D):
     """mvp is a function that takes in a vector of size D and returns another vector of size D.
     This function builds the Jacobian explicitly, and returns a scalar representing the logdet of the Jacobian."""
     jac = np.zeros((D, D))
@@ -43,7 +44,7 @@ def exact_log_det(jvp, D):
     return logdet
 
 
-def exact_log_det_vectorized(mvp_vec, D, N):
+def exact_log_det(mvp_vec, D, N):
     """mvp_vec is a function that takes in a matrix of size N x D and returns another matrix of size N x D.
     This function builds N Jacobians explicitly, and returns a vector representing the logdets of these Jacobians."""
     eye = np.eye(D)
@@ -60,7 +61,7 @@ def exact_log_det_vectorized(mvp_vec, D, N):
     return fast_array_from_list(logdets)
 
 
-def gradient_step_track_entropy(gradfun, x, stepsize, rs, approx=False):
+def gradient_step_track_entropy_non_vectorized(gradfun, x, stepsize, rs, approx=False):
     """Takes one gradient step, and returns an estimate of the change in entropy."""
     (N, D) = x.shape
     assert N == 1
@@ -68,14 +69,14 @@ def gradient_step_track_entropy(gradfun, x, stepsize, rs, approx=False):
     hvp = grad(lambda x, vect : np.dot(gradfun(x), vect))  # Hessian-vector product
     jvp = lambda vect : vect + stepsize * hvp(x, vect)     # Jacobian-vector product
     if approx:
-        delta_entropy = approx_log_det(jvp, D, rs)
+        delta_entropy = approx_log_det_non_vectorized(jvp, D, rs)
     else:
-        delta_entropy = exact_log_det(jvp, D)
+        delta_entropy = exact_log_det_non_vectorized(jvp, D)
     x += stepsize * g
     return x, delta_entropy
 
 
-def gradient_step_track_entropy_vectorized(gradfun, xs, stepsize, rs, approx):
+def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):
     """Takes one gradient step, and returns an estimate of the change in entropy."""
     (N, D) = xs.shape
     gradients = gradfun(xs)
@@ -89,9 +90,9 @@ def gradient_step_track_entropy_vectorized(gradfun, xs, stepsize, rs, approx):
         assert vect.shape == (N,D), vect.shape
         return vect + stepsize * hvp(xs, vect)
     if approx:
-        delta_entropy = approx_log_det_vectorized(jacobian_vector_product, D, N, rs=rs)
+        delta_entropy = approx_log_det(jacobian_vector_product, D, N, rs=rs)
     else:
-        delta_entropy = exact_log_det_vectorized(jacobian_vector_product, D, N)
+        delta_entropy = exact_log_det(jacobian_vector_product, D, N)
     xs += stepsize * gradients
     return xs, delta_entropy
 
@@ -108,7 +109,7 @@ def gradient_ascent_entropic(gradfun, entropies, xs, stepsizes, noise_sizes, rs,
 
     for t in xrange(num_steps):
         if callback: callback(xs=xs, t=t, entropy=delta_entropy)
-        xs, delta_entropy = gradient_step_track_entropy_vectorized(gradfun, xs, stepsizes[t], rs, approx=approx)
+        xs, delta_entropy = gradient_step_track_entropy(gradfun, xs, stepsizes[t], rs, approx=approx)
         noise = rs.randn(N, D) * noise_sizes[t]
         xs = xs + noise
 
