@@ -41,7 +41,7 @@ def plot_samples(mean, cov, file_prefix):
     ax = fig.add_subplot(1, 1, 1)
     ax.set_title("Samples")
     plot_images(sample, ax)
-    fig.set_size_inches((8,12))
+    #fig.set_size_inches((8,12))
     sampleName = file_prefix + 'sample.png'
     plt.savefig(sampleName, pad_inches=0.05, bbox_inches='tight')
 

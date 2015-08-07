@@ -94,6 +94,7 @@ def build_langevin_sampler(loglik_func, D, num_steps, approx):
     parser.add_shape('log_stddev', D)
     parser.add_shape('log_stepsizes', num_steps)
     parser.add_shape('log_noise_sizes', num_steps)
+    parser.add_shape('log_gradient_scales', D)
 
     gradfun = elementwise_grad(loglik_func)
 
@@ -102,12 +103,16 @@ def build_langevin_sampler(loglik_func, D, num_steps, approx):
         stddevs = np.exp(parser.get(params, 'log_stddev'))
         stepsizes = np.exp(parser.get(params, 'log_stepsizes'))
         noise_sizes = np.exp(parser.get(params, 'log_noise_sizes'))
+        gradient_scales = np.exp(parser.get(params, 'log_gradient_scales'))
+
+        scaled_gradfun = lambda x: gradfun(x) * gradient_scales
 
         initial_entropies = np.full(num_samples, entropy_of_a_diagonal_gaussian(stddevs))
         init_xs = mean + rs.randn(num_samples, D) * stddevs
-        samples, entropy_estimates = gradient_ascent_entropic(gradfun, entropies=initial_entropies, xs=init_xs,
-                                                              stepsizes=stepsizes, noise_sizes=noise_sizes,
-                                                              rs=rs, callback=callback, approx=approx)
+        samples, entropy_estimates = \
+            gradient_ascent_entropic(scaled_gradfun, entropies=initial_entropies, xs=init_xs,
+                                     stepsizes=stepsizes, noise_sizes=noise_sizes,
+                                     rs=rs, callback=callback, approx=approx)
 
         loglik_estimates = loglik_func(samples)
         return samples, loglik_estimates, entropy_estimates

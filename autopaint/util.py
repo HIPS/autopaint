@@ -50,10 +50,6 @@ def mean_and_cov(images):
     return empirical_mean, empirical_cov
 
 
-def sample_from_gaussian_model(images, prefix):
-    mean, cov = mean_and_cov(images)
-    plot_samples(mean, cov, prefix)
-
 def fast_array_from_list(xs):
     return np.concatenate([np.expand_dims(x, axis=0) for x in xs], axis=0)
 
