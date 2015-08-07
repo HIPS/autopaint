@@ -23,6 +23,7 @@ def train_mnist_model():
     with open('mnist_models.pkl', 'w') as f:
         pickle.dump(mnist_models, f, 1)
 
+
 def plot_sampler_params(params, unwhitener, filename_prefix):
 
     mean = unwhitener(parser.get(params, 'mean'))
@@ -46,7 +47,33 @@ def plot_sampler_params(params, unwhitener, filename_prefix):
     plt.savefig(filename_prefix + '.png')
 
     matplotlib.image.imsave(filename_prefix + "_mean.png", mean.reshape((28,28)))
-    matplotlib.image.imsave(filename_prefix + "_stddev.png", np.exp(stddev.reshape((28,28))))
+    matplotlib.image.imsave(filename_prefix + "_stddev.png", stddev.reshape((28,28)))
+
+
+def plot_sampler_param_grads(params, unwhitener, filename_prefix):
+
+    mean = unwhitener(parser.get(params, 'mean'))
+    stddev = unwhitener(parser.get(params, 'log_stddev'))
+    stepsizes = parser.get(params, 'log_stepsizes')
+    noise_sizes = parser.get(params, 'log_noise_sizes')
+
+    # ----- Nice versions of Alpha and beta schedules for paper -----
+    fig = plt.figure(0)
+    fig.clf()
+
+    ax = fig.add_subplot(411)
+    ax.plot(stepsizes, 'o-')
+    ax.set_ylabel('stepsizes', fontproperties='serif')
+
+    ax = fig.add_subplot(412)
+    ax.plot(noise_sizes, 'o-')
+    ax.set_ylabel('noise_sizes', fontproperties='serif')
+
+    fig.subplots_adjust(hspace=.5)
+    plt.savefig(filename_prefix + '.png')
+
+    matplotlib.image.imsave(filename_prefix + "_mean.png", mean.reshape((28,28)))
+    matplotlib.image.imsave(filename_prefix + "_stddev.png", stddev.reshape((28,28)))
 
 
 if __name__ == '__main__':
@@ -54,20 +81,21 @@ if __name__ == '__main__':
     t0 = time.time()
 
     num_samples = 50
-    num_langevin_steps = 5
+    num_langevin_steps = 15
     num_sampler_optimization_steps = 100
-    sampler_learn_rate = 0.0001
+    sampler_learn_rate = 0.001
     images_per_row = 10
 
     layer_sizes = [784, 200, 100, 10]
     L2_reg = 1.0
     D = 784
 
-    init_init_stddev_scale = 0.1
-    init_langevin_stepsize = 0.0005
-    init_langevin_noise_size = 0.00001
+    init_init_stddev_scale = 0.2
+    init_langevin_stepsize = 0.0001
+    init_langevin_noise_size = 0.000001
 
-    prior_relax = 0.1
+    prior_relax = 0.05
+    prior_downscale = 0.1
 
     # train_mnist_model()   # Comment after running once.
 
@@ -75,7 +103,7 @@ if __name__ == '__main__':
         trained_weights, all_mean, all_cov = pickle.load(f)
 
     # Regularize all_cov
-    all_cov = all_cov + prior_relax * np.eye(D)
+    all_cov = prior_downscale * (all_cov + prior_relax * np.eye(D))
 
     N_weights, predict_fun, loss_fun, frac_err, nn_loglik = make_nn_funs(layer_sizes, L2_reg)
 
@@ -113,7 +141,7 @@ if __name__ == '__main__':
     rs = np.random.npr.RandomState(0)
     def batch_marginal_likelihood_estimate(sampler_params):
         samples, likelihood_estimates, entropy_estimates = sample_and_run_langevin(sampler_params, rs, num_samples)
-        print "mean loglik:", np.mean(likelihood_estimates), " mean entropy:", np.mean(entropy_estimates)
+        print "mean loglik:", np.mean(likelihood_estimates.value), " mean entropy:", np.mean(entropy_estimates.value)
         fig = plt.figure(1)
         fig.clf()
         ax = fig.add_subplot(111)
@@ -129,7 +157,7 @@ if __name__ == '__main__':
         ml, dml = ml_and_grad(sampler_params)
         print "iter:", i, "log marginal likelihood:", ml, "avg gradient magnitude: ", np.mean(np.abs(dml))
         plot_sampler_params(sampler_params, unwhiten, 'params')
-        plot_sampler_params(dml, unwhiten, 'param_grads')
+        plot_sampler_param_grads(dml, unwhiten, 'param_grads')
 
         sampler_params = sampler_params + sampler_learn_rate * dml
 
