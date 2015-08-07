@@ -5,15 +5,6 @@ from .util import WeightsParser, fast_array_from_list,\
     entropy_of_a_diagonal_gaussian, entropy_of_a_spherical_gaussian
 
 
-def approx_log_det_non_vectorized(mvp, D, rs):
-    # This should be an unbiased estimator of a lower bound on the log determinant
-    # provided the eigenvalues are all greater than 0.317 (solution of
-    # log(x) = (x - 1) - (x - 1)**2 = -2 + 3 * x - x**2
-    R0 = rs.randn(D) # TODO: Consider normalizing R
-    R1 = mvp(R0)
-    R2 = mvp(R1)
-    return np.dot(R0, -2 * R0 + 3 * R1 - R2)
-
 def approx_log_det(mvp_vec, D, N, rs):
     # This should be an unbiased estimator of a lower bound on the log determinant
     # provided the eigenvalues are all greater than 0.317 (solution of
@@ -33,17 +24,6 @@ def approx_log_det_vectorized_avg(mvp_vec, D, N, num_samples, rs):
     return np.mean(approx_logdets, axis=0)
 
 
-def exact_log_det_non_vectorized(jvp, D):
-    """mvp is a function that takes in a vector of size D and returns another vector of size D.
-    This function builds the Jacobian explicitly, and returns a scalar representing the logdet of the Jacobian."""
-    jac = np.zeros((D, D))
-    eye = np.eye(D)
-    for i in xrange(D):
-        jac[:, i] = jvp(eye[:, i])
-    sign, logdet = np.linalg.slogdet(jac)
-    return logdet
-
-
 def exact_log_det(mvp_vec, D, N):
     """mvp_vec is a function that takes in a matrix of size N x D and returns another matrix of size N x D.
     This function builds N Jacobians explicitly, and returns a vector representing the logdets of these Jacobians."""
@@ -59,21 +39,6 @@ def exact_log_det(mvp_vec, D, N):
         logdets.append(logdet)
     assert len(logdets) == N
     return fast_array_from_list(logdets)
-
-
-def gradient_step_track_entropy_non_vectorized(gradfun, x, stepsize, rs, approx=False):
-    """Takes one gradient step, and returns an estimate of the change in entropy."""
-    (N, D) = x.shape
-    assert N == 1
-    g = gradfun(x)
-    hvp = grad(lambda x, vect : np.dot(gradfun(x), vect))  # Hessian-vector product
-    jvp = lambda vect : vect + stepsize * hvp(x, vect)     # Jacobian-vector product
-    if approx:
-        delta_entropy = approx_log_det_non_vectorized(jvp, D, rs)
-    else:
-        delta_entropy = exact_log_det_non_vectorized(jvp, D)
-    x += stepsize * g
-    return x, delta_entropy
 
 
 def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):

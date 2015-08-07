@@ -123,6 +123,7 @@ def build_logprob_mvn(mean, cov):
     pinv = np.linalg.pinv(cov)
     const = log_normalizing_constant_of_a_guassian(cov)
     def logprob_mvn(z):
+        """z is NxD."""
         z_minus_mean = z - mean
         return const - 0.5 * np.einsum('ij,jk,ik->i', z_minus_mean, pinv, z_minus_mean)
     return logprob_mvn
@@ -130,6 +131,7 @@ def build_logprob_mvn(mean, cov):
 def build_logprob_standard_normal(D):
     const = log_normalizing_constant_of_a_guassian(np.eye(D))
     def logprob(z):
+        """z is NxD."""
         return const - 0.5 * np.einsum('ij,ij->i', z, z)
     return logprob
 

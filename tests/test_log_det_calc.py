@@ -2,13 +2,45 @@ import autograd.numpy as np
 import autograd.numpy.random as npr
 
 from autopaint.util import fast_array_from_list
-from autopaint.inference import exact_log_det_non_vectorized, exact_log_det, approx_log_det_non_vectorized,\
-    gradient_step_track_entropy_non_vectorized, gradient_step_track_entropy, approx_log_det,\
+from autopaint.inference import exact_log_det, gradient_step_track_entropy, approx_log_det,\
     build_langevin_sampler, sum_entropy_lower_bound
 from autopaint.util import logprob_two_moons, build_logprob_mvn, build_logprob_standard_normal
 
 from autograd import grad, elementwise_grad
 from autograd.util import quick_grad_check, check_grads
+
+def approx_log_det_non_vectorized(mvp, D, rs):
+    # This should be an unbiased estimator of a lower bound on the log determinant
+    # provided the eigenvalues are all greater than 0.317 (solution of
+    # log(x) = (x - 1) - (x - 1)**2 = -2 + 3 * x - x**2
+    R0 = rs.randn(D) # TODO: Consider normalizing R
+    R1 = mvp(R0)
+    R2 = mvp(R1)
+    return np.dot(R0, -2 * R0 + 3 * R1 - R2)
+
+def exact_log_det_non_vectorized(jvp, D):
+    """mvp is a function that takes in a vector of size D and returns another vector of size D.
+    This function builds the Jacobian explicitly, and returns a scalar representing the logdet of the Jacobian."""
+    jac = np.zeros((D, D))
+    eye = np.eye(D)
+    for i in xrange(D):
+        jac[:, i] = jvp(eye[:, i])
+    sign, logdet = np.linalg.slogdet(jac)
+    return logdet
+
+def gradient_step_track_entropy_non_vectorized(gradfun, x, stepsize, rs, approx=False):
+    """Takes one gradient step, and returns an estimate of the change in entropy."""
+    (N, D) = x.shape
+    assert N == 1
+    g = gradfun(x)
+    hvp = grad(lambda x, vect : np.dot(gradfun(x), vect))  # Hessian-vector product
+    jvp = lambda vect : vect + stepsize * hvp(x, vect)     # Jacobian-vector product
+    if approx:
+        delta_entropy = approx_log_det_non_vectorized(jvp, D, rs)
+    else:
+        delta_entropy = exact_log_det_non_vectorized(jvp, D)
+    x += stepsize * g
+    return x, delta_entropy
 
 def test_exact_log_det():
     D = 10
@@ -185,8 +217,7 @@ def test_entropy_lower_bound():
 
 def test_spherical_mvn():
     D = 10
-    mean = npr.randn(D)
-    mvn1 = build_logprob_mvn(mean, np.eye(D))
+    mvn1 = build_logprob_mvn(np.zeros(D), np.eye(D))
     mvn2 = build_logprob_standard_normal(D)
     points = npr.randn(4, D)
     assert np.all(np.abs(mvn1(points) - mvn2(points) < 0.001)),\
