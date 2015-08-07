@@ -115,3 +115,9 @@ def low_variance_gradient_estimator(grad_entropies, grad_likelihoods):
         From eqn (8) of http://arxiv.org/pdf/1401.1022v3.pdf"""
     empirical_entropy_grad_mean = np.mean(grad_entropies)
     return np.mean((grad_entropies - empirical_entropy_grad_mean)*(grad_entropies + grad_likelihoods))
+
+def sigmoid(x):
+    return 0.5*(np.tanh(x) + 1.0)
+
+def inv_sigmoid(x):
+    return np.arctanh(2.0 * x - 1.0)

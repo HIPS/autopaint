@@ -1,7 +1,7 @@
 import autograd.numpy as np
-from autograd import grad, elementwise_grad
+from autograd import elementwise_grad
 
-from .util import WeightsParser, fast_array_from_list,\
+from .util import WeightsParser, fast_array_from_list, sigmoid,\
     entropy_of_a_diagonal_gaussian, entropy_of_a_spherical_gaussian
 
 
@@ -95,6 +95,7 @@ def build_langevin_sampler(loglik_func, D, num_steps, approx):
     parser.add_shape('log_stepsizes', num_steps)
     parser.add_shape('log_noise_sizes', num_steps)
     parser.add_shape('log_gradient_scales', D)
+    parser.add_shape('invsig_gradient_power', 1)
 
     gradfun = elementwise_grad(loglik_func)
 
@@ -104,8 +105,15 @@ def build_langevin_sampler(loglik_func, D, num_steps, approx):
         stepsizes = np.exp(parser.get(params, 'log_stepsizes'))
         noise_sizes = np.exp(parser.get(params, 'log_noise_sizes'))
         gradient_scales = np.exp(parser.get(params, 'log_gradient_scales'))
+        gradient_power = sigmoid(parser.get(params, 'invsig_gradient_power'))
 
-        scaled_gradfun = lambda x: gradfun(x) * gradient_scales
+        def scaled_gradfun(x):
+            # Todo:  Think about whether this should go inside gradfun,
+            # or in the step-size calculation. (and re-check bounds).
+            # Should we also scale the gradient before we apply the power?
+            gradient = gradfun(x)
+            gradient_magnitude = np.sqrt(np.sum(gradient**2, 1, keepdims=1))
+            return gradient_scales * gradient * gradient_magnitude**(gradient_power - 1.0)
 
         initial_entropies = np.full(num_samples, entropy_of_a_diagonal_gaussian(stddevs))
         init_xs = mean + rs.randn(num_samples, D) * stddevs

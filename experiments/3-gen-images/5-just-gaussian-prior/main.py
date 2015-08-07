@@ -9,7 +9,8 @@ from autograd import value_and_grad
 import matplotlib.pyplot as plt
 import matplotlib.image
 
-from autopaint.util import build_logprob_mvn, log_normalizing_constant_of_a_guassian, entropy_of_a_gaussian
+from autopaint.util import build_logprob_mvn, log_normalizing_constant_of_a_guassian, entropy_of_a_gaussian,\
+    sigmoid, inv_sigmoid
 from autopaint.plotting import plot_images
 from autopaint.inference import build_langevin_sampler
 
@@ -81,6 +82,7 @@ if __name__ == '__main__':
     init_init_stddev_scale = 10.0
     init_langevin_stepsize = 0.001
     init_langevin_noise_size = 0.01
+    init_gradient_power = 0.5
 
     with open('mnist_models.pkl') as f:
         trained_weights, all_mean, all_cov = pickle.load(f)
@@ -109,6 +111,7 @@ if __name__ == '__main__':
     parser.put(sampler_params, 'log_stepsizes', init_log_stepsizes)
     parser.put(sampler_params, 'log_noise_sizes', init_log_noise_sizes)
     parser.put(sampler_params, 'log_gradient_scales', init_log_gradient_scales)
+    parser.put(sampler_params, 'invsig_gradient_power', inv_sigmoid(init_gradient_power))
 
     rs = np.random.npr.RandomState(0)
     def batch_marginal_likelihood_estimate(sampler_params):
@@ -128,6 +131,7 @@ if __name__ == '__main__':
     for i in xrange(num_sampler_optimization_steps):
         ml, dml = ml_and_grad(sampler_params)
         print "Iter:", i, "log marginal likelihood:", ml, "avg gradient size: ", np.mean(np.abs(dml))
+        print "Gradient power:", sigmoid(parser.get(sampler_params, 'invsig_gradient_power'))
         plot_sampler_params(sampler_params)
         plot_sampler_param_grads(dml)
 
