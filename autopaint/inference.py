@@ -20,7 +20,7 @@ def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):
     hvp = elementwise_grad(lambda xs, vect : np.sum(gradfun(xs) * vect, axis=1))
 
     def jacobian_vector_product(vect):
-        """Jacobian of one step of gradient descent."""
+        """Product of vect with Jacobian of one step of gradient descent."""
         assert vect.shape == (N,D), vect.shape
         return vect + stepsize * hvp(xs, vect)
     if approx:
