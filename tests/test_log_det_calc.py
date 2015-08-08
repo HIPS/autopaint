@@ -1,7 +1,7 @@
 import autograd.numpy as np
 import autograd.numpy.random as npr
 
-from autopaint.util import fast_array_from_list
+from autopaint.util import fast_array_from_list, inv_sigmoid
 from autopaint.inference import exact_log_det, gradient_step_track_entropy, approx_log_det,\
     build_langevin_sampler, sum_entropy_lower_bound
 from autopaint.util import logprob_two_moons, build_logprob_mvn, build_logprob_standard_normal
@@ -153,9 +153,6 @@ def test_approx_log_det():
 def test_likelihood_gradient():
     quick_grad_check(logprob_two_moons, np.atleast_2d(np.array([0.1, 0.2]).T))
 
-def test_likelihood_gradient():
-    quick_grad_check(logprob_two_moons, np.atleast_2d(np.array([0.1, 0.2]).T))
-
 
 def test_meta_gradient_with_langevin():
     num_samples = 4
@@ -166,6 +163,8 @@ def test_meta_gradient_with_langevin():
     init_log_stddevs = np.log(1*np.ones(D)) + npr.randn(D) * 0.01
     init_log_stepsizes = np.log(0.01*np.ones(num_langevin_steps)) + npr.randn(num_langevin_steps) * 0.01
     init_log_noise_sizes = np.log(.001*np.ones(num_langevin_steps)) + npr.randn(num_langevin_steps) * 0.01
+    init_log_gradient_scales = np.log(1*np.ones(D))
+    init_gradient_power = 0.9
 
     sample_and_run_langevin, parser = build_langevin_sampler(logprob_two_moons, D, num_langevin_steps, approx=False)
 
@@ -174,33 +173,8 @@ def test_meta_gradient_with_langevin():
     parser.put(sampler_params, 'log_stddev', init_log_stddevs)
     parser.put(sampler_params, 'log_stepsizes', init_log_stepsizes)
     parser.put(sampler_params, 'log_noise_sizes', init_log_noise_sizes)
-
-    def get_batch_marginal_likelihood_estimate(sampler_params):
-        rs = np.random.npr.RandomState(0)
-        samples, loglik_estimates, entropy_estimates = sample_and_run_langevin(sampler_params, rs, num_samples)
-        marginal_likelihood_estimates = loglik_estimates + entropy_estimates
-        return np.mean(marginal_likelihood_estimates)
-
-    check_grads(get_batch_marginal_likelihood_estimate, sampler_params)
-
-
-def test_meta_gradient_with_langevin_mvn():
-    num_samples = 4
-    num_langevin_steps = 3
-
-    D = 2
-    init_mean = npr.randn(D) * 0.01
-    init_log_stddevs = np.log(1*np.ones(D)) + npr.randn(D) * 0.01
-    init_log_stepsizes = np.log(0.01*np.ones(num_langevin_steps)) + npr.randn(num_langevin_steps) * 0.01
-    init_log_noise_sizes = np.log(.001*np.ones(num_langevin_steps)) + npr.randn(num_langevin_steps) * 0.01
-
-    sample_and_run_langevin, parser = build_langevin_sampler(logprob_two_moons, D, num_langevin_steps, approx=False)
-
-    sampler_params = np.zeros(len(parser))
-    parser.put(sampler_params, 'mean', init_mean)
-    parser.put(sampler_params, 'log_stddev', init_log_stddevs)
-    parser.put(sampler_params, 'log_stepsizes', init_log_stepsizes)
-    parser.put(sampler_params, 'log_noise_sizes', init_log_noise_sizes)
+    parser.put(sampler_params, 'log_gradient_scales', init_log_gradient_scales)
+    parser.put(sampler_params, 'invsig_gradient_power', inv_sigmoid(init_gradient_power))
 
     def get_batch_marginal_likelihood_estimate(sampler_params):
         rs = np.random.npr.RandomState(0)

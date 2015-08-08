@@ -38,7 +38,7 @@ def make_nn_funs(layer_sizes, L2_reg):
         return - log_prior - log_lik
 
     def likelihood(W_vect, X, T):
-        return -loss(W_vect, X, T)
+        return np.sum(predict_fun(W_vect, X) * T, axis=1)
 
     def frac_err(W_vect, X, T):
         return np.mean(np.argmax(T, axis=1) != np.argmax(predict_fun(W_vect, X), axis=1))

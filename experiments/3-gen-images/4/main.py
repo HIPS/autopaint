@@ -9,7 +9,7 @@ import matplotlib.image
 
 from autopaint.neuralnet import one_hot, train_nn, make_nn_funs
 from autopaint.util import load_mnist, mean_and_cov, build_logprob_mvn, build_logprob_standard_normal,\
-                            build_unwhitener
+                            build_unwhitener, inv_sigmoid
 from autopaint.plotting import plot_images
 from autopaint.inference import build_langevin_sampler
 
@@ -24,14 +24,14 @@ def train_mnist_model():
         pickle.dump(mnist_models, f, 1)
 
 
-def plot_sampler_params(params, unwhitener, filename_prefix):
+def plot_sampler_params(params):
 
-    mean = unwhitener(parser.get(params, 'mean'))
-    stddev = unwhitener(np.exp(parser.get(params, 'log_stddev')))
+    mean = parser.get(params, 'mean')
+    stddev = np.exp(parser.get(params, 'log_stddev'))
     stepsizes = np.exp(parser.get(params, 'log_stepsizes'))
     noise_sizes = np.exp(parser.get(params, 'log_noise_sizes'))
+    gradscales = np.exp(parser.get(params, 'log_gradient_scales'))
 
-    # ----- Nice versions of Alpha and beta schedules for paper -----
     fig = plt.figure(0)
     fig.clf()
 
@@ -41,39 +41,41 @@ def plot_sampler_params(params, unwhitener, filename_prefix):
 
     ax = fig.add_subplot(412)
     ax.plot(noise_sizes, 'o-')
-    ax.set_ylabel('noise_sizes', fontproperties='serif')
+    ax.set_ylabel('noise sizes', fontproperties='serif')
 
     fig.subplots_adjust(hspace=.5)
-    plt.savefig(filename_prefix + '.png')
+    plt.savefig('params.png')
 
-    matplotlib.image.imsave(filename_prefix + "_mean.png", mean.reshape((28,28)))
-    matplotlib.image.imsave(filename_prefix + "_stddev.png", stddev.reshape((28,28)))
+    matplotlib.image.imsave("mean.png", mean.reshape((28,28)))
+    matplotlib.image.imsave("stddev.png", stddev.reshape((28,28)))
+    matplotlib.image.imsave("gradscale.png", gradscales.reshape((28,28)))
 
 
-def plot_sampler_param_grads(params, unwhitener, filename_prefix):
+def plot_sampler_param_grads(params):
 
-    mean = unwhitener(parser.get(params, 'mean'))
-    stddev = unwhitener(parser.get(params, 'log_stddev'))
+    mean = parser.get(params, 'mean')
+    stddev = parser.get(params, 'log_stddev')
     stepsizes = parser.get(params, 'log_stepsizes')
     noise_sizes = parser.get(params, 'log_noise_sizes')
+    gradscales = parser.get(params, 'log_gradient_scales')
 
-    # ----- Nice versions of Alpha and beta schedules for paper -----
     fig = plt.figure(0)
     fig.clf()
 
     ax = fig.add_subplot(411)
     ax.plot(stepsizes, 'o-')
-    ax.set_ylabel('stepsizes', fontproperties='serif')
+    ax.set_ylabel('grad of log stepsizes', fontproperties='serif')
 
     ax = fig.add_subplot(412)
     ax.plot(noise_sizes, 'o-')
-    ax.set_ylabel('noise_sizes', fontproperties='serif')
+    ax.set_ylabel('grad of log noise sizes', fontproperties='serif')
 
     fig.subplots_adjust(hspace=.5)
-    plt.savefig(filename_prefix + '.png')
+    plt.savefig('grad_params.png')
 
-    matplotlib.image.imsave(filename_prefix + "_mean.png", mean.reshape((28,28)))
-    matplotlib.image.imsave(filename_prefix + "_stddev.png", stddev.reshape((28,28)))
+    matplotlib.image.imsave("grad_init_mean.png", mean.reshape((28,28)))
+    matplotlib.image.imsave("grad_stddev.png", stddev.reshape((28,28)))
+    matplotlib.image.imsave("grad_gradscales.png", gradscales.reshape((28,28)))
 
 
 if __name__ == '__main__':
@@ -93,6 +95,8 @@ if __name__ == '__main__':
     init_init_stddev_scale = 0.2
     init_langevin_stepsize = 0.0001
     init_langevin_noise_size = 0.000001
+    init_gradient_power = 0.95
+    init_log_gradient_scales = np.log(np.ones((1,D)))
 
     prior_relax = 0.05
     prior_downscale = 0.1
@@ -117,7 +121,7 @@ if __name__ == '__main__':
         unwhitened_images = unwhiten(images)
         squashed_images = sigmoid(unwhitened_images)
         likelihood = nn_loglik(trained_weights, squashed_images, labels)
-        return prior + likelihood
+        return likelihood # prior + likelihood
 
     gen_labels = one_hot(np.array([i % 10 for i in range(num_samples)]), 10)
     labeled_likelihood = lambda images: nn_likelihood(images, gen_labels)
@@ -137,6 +141,8 @@ if __name__ == '__main__':
     parser.put(sampler_params, 'log_stddev', init_stddevs)
     parser.put(sampler_params, 'log_stepsizes', init_log_stepsizes)
     parser.put(sampler_params, 'log_noise_sizes', init_log_noise_sizes)
+    parser.put(sampler_params, 'log_gradient_scales', init_log_gradient_scales)
+    parser.put(sampler_params, 'invsig_gradient_power', inv_sigmoid(init_gradient_power))
 
     rs = np.random.npr.RandomState(0)
     def batch_marginal_likelihood_estimate(sampler_params):
@@ -156,8 +162,9 @@ if __name__ == '__main__':
     for i in xrange(num_sampler_optimization_steps):
         ml, dml = ml_and_grad(sampler_params)
         print "iter:", i, "log marginal likelihood:", ml, "avg gradient magnitude: ", np.mean(np.abs(dml))
-        plot_sampler_params(sampler_params, unwhiten, 'params')
-        plot_sampler_param_grads(dml, unwhiten, 'param_grads')
+        print "Gradient power:", sigmoid(parser.get(sampler_params, 'invsig_gradient_power'))
+        plot_sampler_params(sampler_params)
+        plot_sampler_param_grads(dml)
 
         sampler_params = sampler_params + sampler_learn_rate * dml
 

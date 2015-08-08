@@ -1,5 +1,6 @@
 import autograd.numpy as np
-import scipy.linalg
+from scipy.linalg import sqrtm
+from autograd.scipy.special import gammaln
 
 class WeightsParser(object):
     """A helper class to index into a parameter vector."""
@@ -75,11 +76,29 @@ def log_normalizing_constant_of_a_guassian(cov):
 def build_logprob_mvn(mean, cov):
     pinv = np.linalg.pinv(cov)
     const = log_normalizing_constant_of_a_guassian(cov)
-    def logprob_mvn(z):
+    def logprob(z):
         """z is NxD."""
         z_minus_mean = z - mean
         return const - 0.5 * np.einsum('ij,jk,ik->i', z_minus_mean, pinv, z_minus_mean)
-    return logprob_mvn
+    return logprob
+
+def log_normalizing_constant_of_a_mvt(cov, dof):
+    D = cov.shape[0]
+    (sign, logdet) = np.linalg.slogdet(cov)
+    return gammaln((dof + D) / 2.0) - gammaln(dof / 2.0) - 0.5 * D * np.log(dof) \
+           - 0.5 * D * np.log(np.pi) - 0.5 * logdet
+
+def build_logprob_mvt(mean, cov, dof):
+    """Logprob of multivariate student's t"""
+    pinv = np.linalg.pinv(cov)
+    const = log_normalizing_constant_of_a_mvt(cov, dof)
+    D = len(mean)
+    def logprob(z):
+        """z is NxD."""
+        z_minus_mean = z - mean
+        mahalanobois_dist = np.einsum('ij,jk,ik->i', z_minus_mean, pinv, z_minus_mean)
+        return const - 0.5 * (dof - D) * np.logaddexp(1.0, (1.0/dof)*mahalanobois_dist)
+    return logprob
 
 def build_logprob_standard_normal(D):
     const = log_normalizing_constant_of_a_guassian(np.eye(D))
@@ -92,7 +111,7 @@ def build_unwhitener(mean, cov):
     """Builds a function that takes in a draw from a standard normal, and
        turns it into a draw from a MVN with mean, cov."""
     #chol = np.linalg.cholesky(cov)
-    sq = np.real(scipy.linalg.sqrtm(cov))
+    sq = np.real(sqrtm(cov))
     def unwhitener(z):
         return np.dot(z, sq) + mean
     return unwhitener
