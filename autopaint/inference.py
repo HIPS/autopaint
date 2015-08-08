@@ -1,44 +1,13 @@
+# Functions to build a sampler based on Langevin dynamics
+# that also returns an estimate of the lower bound of the marginal
+# likelihood of its output distribution.
+
 import autograd.numpy as np
 from autograd import elementwise_grad
 
-from .util import WeightsParser, fast_array_from_list, sigmoid,\
-    entropy_of_a_diagonal_gaussian, entropy_of_a_spherical_gaussian
-
-
-def approx_log_det(mvp_vec, D, N, rs):
-    # This should be an unbiased estimator of a lower bound on the log determinant
-    # provided the eigenvalues are all greater than 0.317 (solution of
-    # log(x) = (x - 1) - (x - 1)**2 = -2 + 3 * x - x**2
-    # This vectorized version computes N independent bound estimates.
-    R0 = rs.randn(N, D) # TODO: Consider normalizing R.
-    R1 = mvp_vec(R0)
-    R2 = mvp_vec(R1)
-    return np.sum(R0 * (-2 * R0 + 3 * R1 - R2), axis=1)  # Row-wise dot products.
-
-
-def approx_log_det_vectorized_avg(mvp_vec, D, N, num_samples, rs):
-    """Averages over several random projections."""
-    # Can this be vectorized more directly, without a for loop?
-    approx_logdets = [approx_log_det(mvp_vec, D, N, rs) for n in xrange(num_samples)]
-    approx_logdets = fast_array_from_list(approx_logdets)
-    return np.mean(approx_logdets, axis=0)
-
-
-def exact_log_det(mvp_vec, D, N):
-    """mvp_vec is a function that takes in a matrix of size N x D and returns another matrix of size N x D.
-    This function builds N Jacobians explicitly, and returns a vector representing the logdets of these Jacobians."""
-    eye = np.eye(D)
-    matlist = []
-    for i in xrange(D):
-        cur_dir = eye[:, i]
-        matlist.append(mvp_vec(np.tile(cur_dir, (N, 1))))
-    mat = np.concatenate([np.expand_dims(x, axis=2) for x in matlist], axis=2)
-    logdets = []
-    for cur_mat in mat:  # Not vectorized, but could be if autograd supported vectorized calls to slogdet.  Does it?
-        sign, logdet = np.linalg.slogdet(cur_mat)
-        logdets.append(logdet)
-    assert len(logdets) == N
-    return fast_array_from_list(logdets)
+from .util import WeightsParser, sigmoid,\
+    entropy_of_a_diagonal_gaussian, entropy_of_a_spherical_gaussian, \
+    sum_entropy_lower_bound, exact_log_det, approx_log_det
 
 
 def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):
@@ -61,11 +30,6 @@ def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):
     xs += stepsize * gradients
     return xs, delta_entropy
 
-def sum_entropy_lower_bound(entropy_a, entropy_b, D):
-    """Returns lower bound of X + Y given the entropy of X and Y.
-    Uses the entropy power inequality.
-    https://en.wikipedia.org/wiki/Entropy_power_inequality"""
-    return 0.5 * D * np.logaddexp(2.0 * entropy_a / D, 2.0 * entropy_b / D)
 
 def gradient_ascent_entropic(gradfun, entropies, xs, stepsizes, noise_sizes, rs, callback, approx):
     assert len(stepsizes) == len(noise_sizes)
@@ -126,7 +90,3 @@ def build_langevin_sampler(loglik_func, D, num_steps, approx):
         return samples, loglik_estimates, entropy_estimates
 
     return sample_and_run_langevin, parser
-
-
-
-
