@@ -8,7 +8,7 @@ from autograd import elementwise_grad
 
 from .util import WeightsParser, build_logprob_mvn
 
-def simple_linear_model(ll, ll_grad,A,B,stddevs):
+def simple_linear_model(ll_grad,A,B,stddevs):
     def sample(zs):
         (N,D) = zs.shape
         noise = np.randn(N,D)
@@ -30,11 +30,10 @@ def hamiltonian_dynamics(zs,vs,log_like_grad,hmc_stepsize,mass_mat,leap_steps):
     return zs,vs
 
 
-def run_hmc(init_zs,log_like,hmc_stepsize, mass_mat, v_mean,v_cov,rev_mean, rev_cov, num_iters, callback):
-    N = init_zs.shape[0]
-    D = init_zs.shape[1]
-    q_sample, q_log_prob = simple_linear_model(v_mean,v_cov)
-    r_sample, r_log_prob = simple_linear_model(rev_mean,rev_cov)
+def run_hmc(init_zs,log_like,loglik_func_grad,hmc_stepsize, mass_mat, v_A,v_B,v_cov,rev_A,rev_B, rev_cov, num_iters, callback):
+    #Generate q and r models
+    q_sample, q_log_prob = simple_linear_model(loglik_func_grad,v_A,v_B,v_cov)
+    r_sample, r_log_prob = simple_linear_model(loglik_func_grad,rev_A,rev_B,rev_cov)
     L = 0
     zs = init_zs
     for t in xrange(num_iters):
@@ -66,12 +65,14 @@ def build_hmc_sampler(loglik_func, D, num_steps):
 
     #Momentum initialization parameters
     #Diagonal multivariate gaussian
-    parser.add_shape('v_mean',D)
+    parser.add_shape('v_A',(D,D))
+    parser.add_shape('v_B'(D,D))
     parser.add_shape('v_cov',D)
 
     #Create reverse model parameters
     #Simple reverse model (diagonal multivariate gaussian)
-    parser.add_shape('rev_mean',D)
+    parser.add_shape('rev_A',D)
+    parser.add_shape('rev_B',D)
     parser.add_shape('rev_cov',D)
 
     loglik_func_grad = grad(loglik_func)
@@ -84,9 +85,11 @@ def build_hmc_sampler(loglik_func, D, num_steps):
         stddevs = np.exp(parser.get(params, 'log_stddev'))
         hmc_stepsize = parser.get(params, 'hmc_stepsize')
         mass_mat = parser.get(params, 'mass_mat')
-        v_mean = parser.get(params, 'v_mean')
+        v_A = parser.get(params, 'v_A')
+        v_B = parser.get(params,'v_B')
         v_cov = parser.get(params, 'v_cov')
-        rev_mean = parser.get(params,'rev_mean')
+        rev_A = parser.get(params,'rev_A')
+        rev_B = parser.get(params,'rev_B')
         rev_cov = parser.get(params,'rev_cov')
 
         #Create initial sample and combine its log_lik and its entropy
@@ -97,7 +100,7 @@ def build_hmc_sampler(loglik_func, D, num_steps):
         init_L_est = init_ll-init_ent
 
         #Get samples with lower_bound estimate
-        samples, lower_bound_est = run_hmc(init_zs,loglik_func,loglik_func_grad,hmc_stepsize,mass_mat,v_mean,v_cov,rev_mean,rev_cov, callback)
+        samples, lower_bound_est = run_hmc(init_zs,loglik_func,loglik_func_grad,hmc_stepsize,mass_mat,v_A,v_B,v_cov,rev_A,rev_B,rev_cov, callback)
 
         lower_bound_est = lower_bound_est + init_L_est
         #Return samples, lower_bound_est
