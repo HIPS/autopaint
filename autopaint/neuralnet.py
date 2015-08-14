@@ -78,7 +78,7 @@ def sgd(grad, x, callback=None, num_iters=200, step_size=0.1, mass=0.9):
         g = grad(x)
         if callback: callback(x, i, g)
         velocity = mass * velocity - (1.0 - mass) * g
-        x += step_size * velocity
+        x = x + step_size * velocity
     return x
 
 
