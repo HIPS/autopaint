@@ -38,12 +38,12 @@ if __name__ == '__main__':
     num_steps = 20
     leap_steps = 20
     num_sampler_optimization_steps = 400
-    sampler_learn_rate = 1e-6
+    sampler_learn_rate = 1e-8
 
     D = 2
     init_mean = np.zeros(D)
     init_log_stddevs = np.log(.01*np.ones(D))
-    hmc_log_stepsize = np.log(.1)
+    hmc_log_stepsize = np.log(.01)
     mass_mat = np.eye(D)
     v_A = np.zeros(D)
     v_B = np.zeros(D)
