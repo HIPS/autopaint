@@ -105,9 +105,10 @@ def build_hmc_sampler(loglik_func, D, num_steps,leap_steps):
         init_log_prob_mvn = build_logprob_mvn(mean,np.diag(stddevs**2),pseudo_inv=False)
         init_ent = init_log_prob_mvn(init_zs)
         init_L_est = init_ll-init_ent
-
+        print 'init_L_est',np.mean(init_L_est,axis = 0).value
         #Get samples with lower_bound estimate
         samples, lower_bound_est = run_hmc(init_zs,loglik_func,loglik_func_grad,hmc_stepsize,mass_mat,v_A,v_B,v_cov,rev_A,rev_B,rev_cov,num_steps,leap_steps,rs, callback)
+        print 'alpha_sum', np.mean(lower_bound_est,axis = 0).value
         lower_bound_est = lower_bound_est + init_L_est
         #Return samples, lower_bound_est
         return samples, lower_bound_est
