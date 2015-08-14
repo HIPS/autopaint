@@ -20,14 +20,13 @@ def simple_linear_model(ll_grad,A,B,stddevs,rs):
     return sample,log_prob
 
 def hamiltonian_dynamics(zs,vs,log_like_grad,hmc_stepsize,mass_mat,leap_steps):
-    #mass_mat not yet implemented
     for i in xrange(leap_steps):
-        #Half step in momentum
-        vs = vs + hmc_stepsize*log_like_grad(zs)/2
-        #Full sample step
-        zs = zs + hmc_stepsize*vs
-        #Half step in momentum
-        vs = vs + hmc_stepsize*log_like_grad(zs)/2
+            #Half step in momentum
+            vs = vs + hmc_stepsize*log_like_grad(zs)/2
+            #Full sample step
+            zs = zs + hmc_stepsize*np.dot(vs,mass_mat)
+            #Half step in momentum
+            vs = vs + hmc_stepsize*log_like_grad(zs)/2
     return zs,vs
 
 
@@ -35,12 +34,13 @@ def run_hmc(init_zs,log_like,loglik_func_grad,hmc_stepsize, mass_mat, v_A,v_B,v_
     #Generate q and r models
     q_sample, q_log_prob = simple_linear_model(loglik_func_grad,v_A,v_B,v_cov,rs)
     r_sample, r_log_prob = simple_linear_model(loglik_func_grad,rev_A,rev_B,rev_cov,rs)
-    L = 0
+    (N,D) = init_zs.shape
+    L = np.zeros(N)
     zs = init_zs
     for t in xrange(num_iters):
         #Draw momentum
         vs = q_sample(zs)
-        #Apply hamiltonian dynamics with current sample, compute new samples and delta entropies
+        #Apply hamiltonian dynamics with current samples
         new_zs, new_vs = hamiltonian_dynamics(zs,vs,loglik_func_grad,hmc_stepsize,mass_mat,leap_steps)
         #Compute alpha
         log_rev_prob_new_v = r_log_prob(new_vs,new_zs)
@@ -105,10 +105,11 @@ def build_hmc_sampler(loglik_func, D, num_steps,leap_steps):
         init_log_prob_mvn = build_logprob_mvn(mean,np.diag(stddevs**2),pseudo_inv=False)
         init_ent = init_log_prob_mvn(init_zs)
         init_L_est = init_ll-init_ent
-        print 'init_L_est',np.mean(init_L_est,axis = 0).value
+        # print 'init_L_est',np.mean(init_L_est,axis = 0).value
+        # print 'init_L_est cov', stddevs.value
         #Get samples with lower_bound estimate
         samples, lower_bound_est = run_hmc(init_zs,loglik_func,loglik_func_grad,hmc_stepsize,mass_mat,v_A,v_B,v_cov,rev_A,rev_B,rev_cov,num_steps,leap_steps,rs, callback)
-        print 'alpha_sum', np.mean(lower_bound_est,axis = 0).value
+        # print 'alpha_sum', np.mean(lower_bound_est,axis = 0).value
         lower_bound_est = lower_bound_est + init_L_est
         #Return samples, lower_bound_est
         return samples, lower_bound_est
