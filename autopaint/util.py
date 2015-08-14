@@ -1,6 +1,6 @@
 import autograd.numpy as np
 from scipy.linalg import sqrtm
-from autograd.scipy.special import gammaln
+# from autograd.scipy.special import gammaln
 
 class WeightsParser(object):
     """A helper class to index into a parameter vector."""
@@ -73,8 +73,11 @@ def log_normalizing_constant_of_a_guassian(cov):
     (sign, logdet) = np.linalg.slogdet(cov)
     return -0.5 * D * np.log(2*np.pi) - 0.5 * logdet
 
-def build_logprob_mvn(mean, cov):
-    pinv = np.linalg.pinv(cov)
+def build_logprob_mvn(mean, cov,pseudo_inv = True):
+    if pseudo_inv == True:
+        pinv = np.linalg.pinv(cov)
+    else:
+        pinv = np.linalg.inv(cov)
     const = log_normalizing_constant_of_a_guassian(cov)
     def logprob(z):
         """z is NxD."""
@@ -182,3 +185,4 @@ def sum_entropy_lower_bound(entropy_a, entropy_b, D):
     Uses the entropy power inequality.
     https://en.wikipedia.org/wiki/Entropy_power_inequality"""
     return 0.5 * D * np.logaddexp(2.0 * entropy_a / D, 2.0 * entropy_b / D)
+
