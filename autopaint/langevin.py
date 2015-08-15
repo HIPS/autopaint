@@ -16,7 +16,7 @@ def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):
     gradients = gradfun(xs)
 
     # Hessian-vector product of log-likelihood function.
-    # Would use np.dot(gradfun(xs), vect)), but we want to do this in parallel.
+    # Vectorized version of np.dot(gradfun(xs), vect)).
     hvp = elementwise_grad(lambda xs, vect : np.sum(gradfun(xs) * vect, axis=1))
 
     def jacobian_vector_product(vect):
@@ -64,10 +64,10 @@ def build_langevin_sampler(loglik_func, D, num_steps, approx):
     gradfun = elementwise_grad(loglik_func)
 
     def sample_and_run_langevin(params, rs, num_samples, callback=None):
-        mean = parser.get(params, 'mean')
-        stddevs = np.exp(parser.get(params, 'log_stddev'))
-        stepsizes = np.exp(parser.get(params, 'log_stepsizes'))
-        noise_sizes = np.exp(parser.get(params, 'log_noise_sizes'))
+        mean                   = parser.get(params, 'mean')
+        stddevs         = np.exp(parser.get(params, 'log_stddev'))
+        stepsizes       = np.exp(parser.get(params, 'log_stepsizes'))
+        noise_sizes     = np.exp(parser.get(params, 'log_noise_sizes'))
         gradient_scales = np.exp(parser.get(params, 'log_gradient_scales'))
         gradient_power = sigmoid(parser.get(params, 'invsig_gradient_power'))
 
@@ -76,7 +76,7 @@ def build_langevin_sampler(loglik_func, D, num_steps, approx):
             # or in the step-size calculation. (and re-check bounds).
             # Should we also scale the gradient before we apply the power?
             gradient = gradfun(x)
-            gradient_magnitude = np.sqrt(np.sum(gradient**2, 1, keepdims=1))
+            gradient_magnitude = np.sqrt(np.sum(gradient**2, 1, keepdims=True))
             return gradient_scales * gradient * gradient_magnitude**(gradient_power - 1.0)
 
         initial_entropies = np.full(num_samples, entropy_of_a_diagonal_gaussian(stddevs))

@@ -11,10 +11,10 @@ nonlinearity_grad = elementwise_grad(nonlinearity)
 
 def flow_step(zs, output_weights, transform_weights, bias):
     activations = np.dot(zs, transform_weights) + bias
-    zs = zs + np.outer(nonlinearity(activations), output_weights)              # Equation 10
-    s = np.dot(output_weights, transform_weights)
-    delta_entropy = np.log(np.abs(1.0 + s * nonlinearity_grad(activations)))  # Equations 11 and 12
-    return zs, delta_entropy
+    zs = zs + np.outer(nonlinearity(activations), output_weights)  # Equation 10
+    warp_jacobian = np.dot(output_weights, transform_weights) * nonlinearity_grad(activations)
+    entropy_change = np.log(np.abs(1.0 + warp_jacobian))           # Equations 11 and 12
+    return zs, entropy_change
 
 def composed_flow(entropies, zs, output_weights, transform_weights, biases, callback):
     num_steps = len(biases)
