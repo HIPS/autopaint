@@ -35,15 +35,15 @@ if __name__ == '__main__':
     rs = np.random.npr.RandomState(0)
 
     num_samples = 100
-    num_steps = 20
-    leap_steps = 20
+    num_steps = 1
+    leap_steps = 7
     num_sampler_optimization_steps = 400
-    sampler_learn_rate = 1e-8
+    sampler_learn_rate = 1e-5
 
     D = 2
     init_mean = np.zeros(D)
-    init_log_stddevs = np.log(.01*np.ones(D))
-    hmc_log_stepsize = np.log(.01)
+    init_log_stddevs = np.log(.1*np.ones(D))
+    hmc_log_stepsize = np.log(.1)
     mass_mat = np.eye(D)
     v_A = np.zeros(D)
     v_B = np.zeros(D)
@@ -52,8 +52,8 @@ if __name__ == '__main__':
     rev_B = np.zeros(D)
     rev_log_cov = np.log(.01*np.ones(D))
 
-    # logprob_mvn = build_logprob_mvn(mean=np.array([0.0,0.0]), cov=np.array([[1.0,0.9], [0.9,1.0]]),pseudo_inv = False)
-    hmc_sample, parser = build_hmc_sampler(logprob_two_moons, D, num_steps,leap_steps)
+    logprob_mvn = build_logprob_mvn(mean=np.array([0.0,0.0]), cov=np.array([[1.0,0.9], [0.9,1.0]]),pseudo_inv = False)
+    hmc_sample, parser = build_hmc_sampler(logprob_mvn, D, num_steps,leap_steps)
 
     sampler_params = np.zeros(len(parser))
     parser.put(sampler_params, 'mean', init_mean)

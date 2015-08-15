@@ -68,6 +68,22 @@ def logprob_wiggle(z):
     z2 = z[:, 1]
     return -0.5 * (z2 - np.sin(2.0 * np.pi * z1 / 4.0) / 0.4 )**2 - 0.2 * (z1**2 + z2**2)
 
+def log_inv_rosenbrock(z):
+    #z is (N,D)
+    #Returns s (N,) for 1/(rosenbrock(z)+relaxation)
+    relaxation = 1e-6
+    scale = 1e2
+    (N,D) = z.shape
+    s = np.zeros(N)
+    for i in xrange(D-1):
+        s = s + (1-z[:,i])**2+100*(z[:,i+1]-z[:,i]**2)**2
+    # #Multiply by squared gaussian to prevent entropy from blowing up
+    # result = 1/(s+relaxation)*np.exp(-scale*np.sum(z**2,axis = 1))
+    result = np.log(1/(s+relaxation))
+    return result
+
+
+
 def log_normalizing_constant_of_a_guassian(cov):
     D = cov.shape[0]
     (sign, logdet) = np.linalg.slogdet(cov)
