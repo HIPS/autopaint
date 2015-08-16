@@ -24,7 +24,6 @@ class WeightsParser(object):
     def __len__(self):
         return self.num_weights
 
-
 def load_mnist():
     print "Loading training data..."
     import imp, urllib
@@ -70,19 +69,26 @@ def logprob_wiggle(z):
 
 def log_inv_rosenbrock(z):
     #z is (N,D)
-    #Returns s (N,) for 1/(rosenbrock(z)+relaxation)
+    #Returns (N,) of log( 1/(rosenbrock(z)+relaxation))
     relaxation = 1e-6
-    scale = 1e2
     (N,D) = z.shape
     s = np.zeros(N)
     for i in xrange(D-1):
         s = s + (1-z[:,i])**2+100*(z[:,i+1]-z[:,i]**2)**2
-    # #Multiply by squared gaussian to prevent entropy from blowing up
-    # result = 1/(s+relaxation)*np.exp(-scale*np.sum(z**2,axis = 1))
     result = np.log(1/(s+relaxation))
     return result
 
-
+def log_tapered_inv_rosenbrock(z):
+    #z is (N,D)
+    #Returns s (N,) tapers inv_ros by sq exp to prevent entropy from exploding as D grows
+    relaxation = 1e-6
+    (N,D) = z.shape
+    scale = 1e-4
+    s = np.zeros(N)
+    for i in xrange(D-1):
+        s = s + (1-z[:,i])**2+100*(z[:,i+1]-z[:,i]**2)**2
+    result = np.log(1/(s+relaxation)*np.exp(-scale*np.sum(z**2)))
+    return result
 
 def log_normalizing_constant_of_a_guassian(cov):
     D = cov.shape[0]
@@ -201,4 +207,14 @@ def sum_entropy_lower_bound(entropy_a, entropy_b, D):
     Uses the entropy power inequality.
     https://en.wikipedia.org/wiki/Entropy_power_inequality"""
     return 0.5 * D * np.logaddexp(2.0 * entropy_a / D, 2.0 * entropy_b / D)
+
+def neg_kl_diag_normal(mu,sig):
+    #Computes of the -1 * kl divergence of a diagonal gaussians vs a normal gaussian
+    #Takes in an nxd vectors of means and diagonal covariances
+    D = mu.shape[1]
+    combined_mat = np.log(sig**2)-mu**2-sig**2
+    kl_vect = np.sum(combined_mat,axis = 1)
+    kl_vect = kl_vect + D*np.ones(mu.shape[0])
+    kl_vect = .5*kl_vect
+    return kl_vect
 

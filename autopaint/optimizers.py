@@ -34,6 +34,30 @@ def adam(value_and_grad,params,num_iters, alpha = .001, beta1 = .9,beta2 = .999,
     return params,val
 
 
+def adam_mini_batch(batch_value_and_grad,params,batch_idxs,num_epochs, alpha = .001, beta1 = .9,beta2 = .999, eps = 1e-8,callback = None):
+    # Maximizes a stochastic function using ADAM in minibatch
+    # http://arxiv.org/pdf/1412.6980v8.pdf
+    # batch_value_and_grad is a function that returns the value and gradient of the function at params at idxs in batch_idx
+    D = len(params)
+    m = np.zeros(D)
+    v = np.zeros(D)
+    for i in xrange(num_epochs):
+        for idxs in batch_idxs:
+            start = time.time()
+            val, grad = batch_value_and_grad(params,idxs)
+            if callback:
+                callback(val,params)
+            m = beta1*m + (1-beta1)*grad
+            v = beta2*v + (1-beta2)*grad**2
+            mhat = m/(1-beta1**(i+1))
+            vhat = v/(1-beta2**(i+1))
+            params = params + alpha * mhat/(np.sqrt(vhat)+eps)
+            end = time.time()
+            print 'time per iter:', end - start
+    val, grad = batch_value_and_grad(params,idxs)
+    return params,val
+
+
 def ada_delta(value_and_grad,params,num_iters, rho = .001, eps = 1e-8,callback = None):
     # Maximizes a stochastic function using ADADELTA
     # http://arxiv.org/pdf/1212.5701v1.pdf

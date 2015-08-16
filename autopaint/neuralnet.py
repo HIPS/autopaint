@@ -3,6 +3,7 @@ import autograd.numpy.random as npr
 from autograd.scipy.misc import logsumexp
 from autograd import grad
 from autograd.util import quick_grad_check
+from autopaint.util import sigmoid
 
 
 # Network parameters   TODO: move these into experiment scripts.
@@ -15,6 +16,7 @@ learning_rate = 1e-3
 momentum = 0.9
 batch_size = 256
 num_epochs = 50
+
 
 def make_nn_funs(layer_sizes, L2_reg):
     shapes = zip(layer_sizes[:-1], layer_sizes[1:])
@@ -44,6 +46,59 @@ def make_nn_funs(layer_sizes, L2_reg):
         return np.mean(np.argmax(T, axis=1) != np.argmax(predict_fun(W_vect, X), axis=1))
 
     return N, predict_fun, loss, frac_err, likelihood
+
+
+def make_binarized_nn_funs(layer_sizes, L2_reg):
+    #Like a neural net, but now our outputs are in [0,1]^D and the labels are {0,1}^D
+    shapes = zip(layer_sizes[:-1], layer_sizes[1:])
+    N = sum((m+1)*n for m, n in shapes)
+
+    def unpack_layers(W_vect):
+        for m, n in shapes:
+            yield W_vect[:m*n].reshape((m,n)), W_vect[m*n:m*n+n]
+            W_vect = W_vect[(m+1)*n:]
+
+    def predict_fun(W_vect, inputs):
+        """Probability of activation of outputs"""
+        for W, b in unpack_layers(W_vect):
+            outputs = np.dot(inputs, W) + b
+            inputs = np.tanh(outputs)
+        return sigmoid(outputs)
+
+    def likelihood(W_vect, X, T):
+        pred_probs = predict_fun(W_vect,X)
+        label_probabilities =  pred_probs* T + (1 - pred_probs) * (1 - T)
+        return np.sum(label_probabilities)
+
+    return N, predict_fun, likelihood
+
+
+def make_gaussian_nn_funs(layer_sizes, L2_reg):
+    #Like a neural net, but now our outputs are a mean and the log of a diagonal covariance matrix
+    shapes = zip(layer_sizes[:-1], layer_sizes[1:])
+    N = sum((m+1)*n for m, n in shapes)
+
+    def unpack_layers(W_vect):
+        for m, n in shapes:
+            yield W_vect[:m*n].reshape((m,n)), W_vect[m*n:m*n+n]
+            W_vect = W_vect[(m+1)*n:]
+
+    def predict_fun(W_vect, inputs):
+        """Returns the mean of a gaussian and the log of a diagonal covariance matrix """
+        for W, b in unpack_layers(W_vect):
+            outputs = np.dot(inputs, W) + b
+            inputs = np.tanh(outputs)
+        D = inputs.shape[1]/2
+        mu = outputs[:,0:D]
+        log_sig = outputs[:,D:2*D]
+        return mu,log_sig
+
+    def likelihood(W_vect, X, T):
+        mu,log_sig = predict_fun(W_vect,X)
+        log_probs = np.sum(-(0.5 * np.log(2 * np.pi) + log_sig) - 0.5 * ((T - mu) / np.exp(log_sig))**2)
+        return log_probs
+
+    return N, predict_fun, likelihood
 
 one_hot = lambda x, K: np.array(x[:,None] == np.arange(K)[None, :], dtype=int)
 

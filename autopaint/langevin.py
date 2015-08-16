@@ -2,12 +2,15 @@
 # that also returns an estimate of the lower bound of the marginal
 # likelihood of its output distribution.
 
+import time
 import autograd.numpy as np
 from autograd import elementwise_grad
 
-from .util import WeightsParser, sigmoid,\
+
+from autopaint.util import WeightsParser, sigmoid,\
     entropy_of_a_diagonal_gaussian, entropy_of_a_spherical_gaussian, \
     sum_entropy_lower_bound, exact_log_det, approx_log_det
+
 
 
 def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):
@@ -24,7 +27,10 @@ def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):
         assert vect.shape == (N,D), vect.shape
         return vect + stepsize * hvp(xs, vect)
     if approx:
+        grad_step_start = time.time()
         delta_entropy = approx_log_det(jacobian_vector_product, D, N, rs=rs)
+        grad_step_end = time.time()
+        # print "log_det_time", grad_step_end-grad_step_start
     else:
         delta_entropy = exact_log_det(jacobian_vector_product, D, N)
     xs += stepsize * gradients
@@ -38,6 +44,7 @@ def gradient_ascent_entropic(gradfun, entropies, xs, stepsizes, noise_sizes, rs,
 
     for t in xrange(num_steps):
         if callback: callback(xs=xs, t=t, entropy=delta_entropy)
+        grad_step_start = time.time()
         xs, delta_entropy = gradient_step_track_entropy(gradfun, xs, stepsizes[t], rs, approx=approx)
         noise = rs.randn(N, D) * noise_sizes[t]
         xs = xs + noise

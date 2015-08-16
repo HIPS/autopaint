@@ -63,3 +63,10 @@ def plot_density(samples, filename):
     ax = fig.add_subplot(111)
     plt.scatter(samples[:,0], samples[:,1])
     plt.savefig(filename)
+
+
+def plot_line(x,y, filename):
+    fig = plt.figure(0); fig.clf()
+    ax = fig.add_subplot(111)
+    plt.plot(x, y)
+    plt.savefig(filename)
