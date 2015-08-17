@@ -20,8 +20,8 @@ def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,sample
     train_images_repeat = np.repeat(train_images,samples_per_image,axis=0)
     mean_log_prob = decode_log_like(dec_w,Z_samples,train_images_repeat)
     kl_vect = neg_kl_diag_normal(mus,sigs)
-    print "ll average", mean_log_prob.value
-    print "kl average", np.mean(kl_vect).value
+    # print "ll average", mean_log_prob.value
+    # print "kl average", np.mean(kl_vect).value
     return mean_log_prob+np.mean(kl_vect)
 
 def build_encoder(enc_layers):
@@ -59,10 +59,6 @@ def run_aevb(train_images):
     dec_w = rs.randn(N_weights_dec) * param_scale
 
     weights = np.concatenate((enc_w,dec_w))
-
-    def lower_bound_test(weights):
-        rs = npr.RandomState(0)
-        return lower_bound(weights,encoder,decoder_log_like,N_weights_enc,train_images,samples_per_image,latent_dimensions,rs)
 
     batch_idxs = make_batches(train_images.shape[0], batch_size)
 
@@ -104,5 +100,5 @@ if __name__ == '__main__':
     #     N_data, train_images, train_labels, test_images, test_labels = pickle.load(f)
     # #
 
-    train_images = np.random.multivariate_normal(np.zeros(2),np.array([[1,.9],[.9,1]]),1000)
+    train_images = np.random.multivariate_normal(np.zeros(2),np.array([[1,0],[0,1]]),1000)
     run_aevb(train_images)
