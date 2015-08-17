@@ -1,7 +1,7 @@
 import autograd.numpy as np
 from autograd import value_and_grad
 from autograd.util import check_grads, quick_grad_check
-from autopaint.util import load_mnist, neg_kl_diag_normal
+from autopaint.util import load_mnist, neg_kl_diag_normal,build_logprob_mvn
 from autopaint.neuralnet import one_hot, train_nn, make_nn_funs,make_batches, make_gaussian_nn_funs
 from plotting import plot_density
 import autograd.numpy.random as npr
@@ -18,11 +18,11 @@ def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,sample
     Z_samples = mus + sigs*noise
     assert Z_samples.shape == (train_images.shape[0]*samples_per_image,latent_dimensions)
     train_images_repeat = np.repeat(train_images,samples_per_image,axis=0)
-    ll_vect = decode_log_like(dec_w,Z_samples,train_images_repeat)
+    mean_log_prob = decode_log_like(dec_w,Z_samples,train_images_repeat)
     kl_vect = neg_kl_diag_normal(mus,sigs)
-    print "ll average", np.mean(ll_vect).value
+    print "ll average", mean_log_prob.value
     print "kl average", np.mean(kl_vect).value
-    return np.mean(ll_vect)+np.mean(kl_vect)
+    return mean_log_prob+np.mean(kl_vect)
 
 def build_encoder(enc_layers):
     L2_reg = 0
@@ -87,8 +87,6 @@ def run_aevb(train_images):
     samples = muSamples+sig_samples*noise
     print 'empirical mean', np.mean(samples,axis=0)
     print 'empirical cov', np.cov((samples.T))
-    # print 'mu of decoder is', muSamples[0,:]
-    # print 'sigs of decoder is', sig_samples[0,:]
     plot_density(samples, "aevb_approximating_dist.png")
 
     t1 = time.time()
@@ -105,5 +103,6 @@ if __name__ == '__main__':
     # with open('mnist_data.pkl') as f:
     #     N_data, train_images, train_labels, test_images, test_labels = pickle.load(f)
     # #
-    train_images = np.random.multivariate_normal(np.zeros(2),np.array([[1,0],[0,1]]),1000)
+
+    train_images = np.random.multivariate_normal(np.zeros(2),np.array([[1,.9],[.9,1]]),1000)
     run_aevb(train_images)

@@ -3,7 +3,7 @@ import autograd.numpy.random as npr
 from autograd.scipy.misc import logsumexp
 from autograd import grad
 from autograd.util import quick_grad_check
-from autopaint.util import sigmoid
+from autopaint.util import sigmoid,build_logprob_mvn
 
 
 # Network parameters   TODO: move these into experiment scripts.
@@ -95,8 +95,15 @@ def make_gaussian_nn_funs(layer_sizes, L2_reg):
 
     def likelihood(W_vect, X, T):
         mu,log_sig = predict_fun(W_vect,X)
-        log_probs = np.sum(-(0.5 * np.log(2 * np.pi) + log_sig) - 0.5 * ((T - mu) / np.exp(log_sig))**2)
-        return log_probs
+        N = mu.shape[0]
+        #TODO: Vectorize
+        sum_logprobs = 0
+        for i in xrange(N):
+            curMu = mu[i,:]
+            curCov = np.diag(np.exp(log_sig[i,:]))
+            cur_log_prob = build_logprob_mvn(curMu,curCov,pseudo_inv=False)
+            sum_logprobs = sum_logprobs + cur_log_prob(T[i,:])
+        return sum_logprobs/N
 
     return N, predict_fun, likelihood
 
