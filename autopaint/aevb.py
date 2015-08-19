@@ -14,6 +14,13 @@ from autopaint.optimizers import adam_mini_batch, sga_mini_batch,ada_grad_mini_b
 def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,samples_per_image,latent_dimensions,rs):
     enc_w = weights[0:N_weights_enc]
     dec_w = weights[N_weights_enc:len(weights)]
+    mean_log_prob = compute_log_prob(enc_w,dec_w,encode,decode_log_like,train_images,samples_per_image,latent_dimensions,rs)
+    mean_kl = compute_kl(enc_w,train_images,encode)
+    print "ll average", mean_log_prob.value
+    print "kl average", mean_kl.value
+    return  mean_log_prob + mean_kl
+
+def compute_log_prob(enc_w,dec_w,encode,decode_log_like,train_images,samples_per_image,latent_dimensions,rs):
     (mus,log_sigs) = encode(enc_w,train_images)
     sigs = np.exp(log_sigs)
     noise = rs.randn(samples_per_image,train_images.shape[0],latent_dimensions)
@@ -21,10 +28,13 @@ def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,sample
     Z_samples = np.reshape(Z_samples,(train_images.shape[0]*samples_per_image,latent_dimensions),order = 'F')
     train_images_repeat = np.repeat(train_images,samples_per_image,axis=0)
     mean_log_prob = decode_log_like(dec_w,Z_samples,train_images_repeat)
+    return mean_log_prob
+
+def compute_kl(enc_w,train_images,encode):
+    (mus,log_sigs) = encode(enc_w,train_images)
+    sigs = np.exp(log_sigs)
     kl_vect = neg_kl_diag_normal(mus,sigs)
-    print "ll average", mean_log_prob.value
-    print "kl average", np.mean(kl_vect).value
-    return  mean_log_prob + np.mean(kl_vect)
+    return np.mean(kl_vect)
 
 def build_encoder(enc_layers):
     L2_reg = 0
@@ -48,7 +58,7 @@ def run_aevb(train_images):
     # Training parameters
     param_scale = 0.1
     samples_per_image = 5
-    latent_dimensions = 3
+    latent_dimensions = 20
     hidden_units = 500
     D = train_images.shape[1]
 
@@ -74,6 +84,17 @@ def run_aevb(train_images):
             return lower_bound(weights,encoder,decoder_log_like,N_weights_enc,train_images[idxs],samples_per_image,latent_dimensions,rs)
         #TODO:Make it so we don't have to recompute gradient at each iter? (Currently not necessary since it is very fast)
         val_and_grad_func = value_and_grad(batch_lower_bound)
+        #Generate samples
+        num_samples = 100
+        images_per_row = 10
+        z = rs.randn(num_samples,latent_dimensions)
+        samples = decoder(dec_w,z)
+        fig = plt.figure(1)
+        fig.clf()
+        ax = fig.add_subplot(111)
+        plot_images(samples, ax, ims_per_row=images_per_row)
+        plt.savefig('samples.png')
+
         return val_and_grad_func(weights)
 
     def print_ml(ml,weights):
@@ -94,16 +115,6 @@ def run_aevb(train_images):
     # print 'empirical cov', np.cov((samples.T))
     # plot_density(samples, "aevb_approximating_dist.png")
 
-    #Generate samples
-    num_samples = 100
-    images_per_row = 10
-    z = rs.randn(num_samples,latent_dimensions)
-    samples = decoder(dec_w,z)
-    fig = plt.figure(1)
-    fig.clf()
-    ax = fig.add_subplot(111)
-    plot_images(samples, ax, ims_per_row=images_per_row)
-    plt.savefig('samples.png')
 
     t1 = time.time()
     print "total runtime", t1-t0
@@ -114,12 +125,12 @@ def load_and_pickle_binary_mnist():
     train_images = np.round(train_images)
     test_images = np.round(test_images)
     mnist_data = N_data, train_images, train_labels, test_images, test_labels
-    with open('mnist_data.pkl', 'w') as f:
+    with open('mnist_binary_data.pkl', 'w') as f:
         pickle.dump(mnist_data, f, 1)
 
 if __name__ == '__main__':
     # load_and_pickle_binary_mnist()
-    with open('mnist_data.pkl') as f:
+    with open('mnist_binary_data.pkl') as f:
         N_data, train_images, train_labels, test_images, test_labels = pickle.load(f)
 
 
