@@ -7,7 +7,7 @@ def sga(value_and_grad,params,num_iters, alpha = .001,callback = None):
     for i in xrange(num_iters):
         val, grad = value_and_grad(params)
         if callback:
-            callback(val,params)
+            callback(val,params,grad)
         params = params + alpha * grad
     val = value_and_grad(params)
     return params,val
@@ -20,7 +20,7 @@ def sga_mini_batch(batch_value_and_grad,params,batch_idxs,num_epochs, alpha = .0
             start = time.time()
             val, grad = batch_value_and_grad(params,idxs)
             if callback:
-                callback(val,params)
+                callback(val,params,grad)
             params = params + alpha * grad
             end = time.time()
             print 'time per iter:', end - start
@@ -37,7 +37,7 @@ def adam(value_and_grad,params,num_iters, alpha = .001, beta1 = .9,beta2 = .999,
         start = time.time()
         val, grad = value_and_grad(params)
         if callback:
-            callback(val,params)
+            callback(val,params,grad)
         m = beta1*m + (1-beta1)*grad
         v = beta2*v + (1-beta2)*grad**2
         mhat = m/(1-beta1**(i+1))
@@ -61,7 +61,7 @@ def adam_mini_batch(batch_value_and_grad,params,batch_idxs,num_epochs, alpha = .
             start = time.time()
             val, grad = batch_value_and_grad(params,idxs)
             if callback:
-                callback(val,params)
+                callback(val,params,grad)
             m = beta1*m + (1-beta1)*grad
             v = beta2*v + (1-beta2)*grad**2
             mhat = m/(1-beta1**(i+1))
@@ -82,7 +82,7 @@ def ada_grad_mini_batch(batch_value_and_grad,params,batch_idxs,num_epochs, alpha
             start = time.time()
             val, grad = batch_value_and_grad(params,idxs)
             if callback:
-                callback(val,params)
+                callback(val,params,grad)
             grad_sq_hist = grad_sq_hist + grad**2
             params = params + alpha*1/(np.sqrt(grad_sq_hist)+eps)*grad
             end = time.time()
@@ -100,7 +100,7 @@ def ada_delta(value_and_grad,params,num_iters, rho = .001, eps = 1e-8,callback =
     for i in xrange(num_iters):
         val, grad = value_and_grad(params)
         if callback:
-            callback(val,params)
+            callback(val,params,grad)
         g_sq = rho*g_sq + (1-rho)*grad**2
         d = np.sqrt(d_sq+eps)/np.sqrt(g_sq+eps)*grad
         d_sq = rho*d_sq + (1-rho)*d**2
