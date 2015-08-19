@@ -4,7 +4,7 @@
 import autograd.numpy as np
 from autograd import elementwise_grad
 
-from .util import WeightsParser, entropy_of_a_diagonal_gaussian
+from .util import WeightsParser, entropy_of_a_diagonal_gaussian,entropy_of_diagonal_gaussians
 
 nonlinearity = np.tanh
 nonlinearity_grad = elementwise_grad(nonlinearity)
@@ -50,3 +50,28 @@ def build_flow_sampler(loglik_func, D, num_steps):
         return samples, loglik_estimates, entropy_estimates
 
     return flow_sample, parser
+
+
+def build_batch_flow_sampler(D, num_steps,batch_size):
+
+    parser = WeightsParser()
+    parser.add_shape('output weights', (num_steps, D))
+    parser.add_shape('transform weights', (num_steps, D))
+    parser.add_shape('biases', (num_steps))
+
+    def flow_sample(params,mean,stddevs, rs, num_samples, callback=None):
+        output_weights = parser.get(params, 'output weights')
+        transform_weights = parser.get(params, 'transform weights')
+        biases = parser.get(params, 'biases')
+
+        initial_entropies = np.full((num_samples,batch_size), entropy_of_diagonal_gaussians(stddevs))
+        initial_entropies = np.reshape(initial_entropies,(num_samples*batch_size),order = 'F')
+        noise = rs.randn(D, batch_size,num_samples)
+        init_zs = mean + noise * stddevs
+        init_zs = np.reshape(init_zs, (batch_size*num_samples,D),order = 'F')
+        samples, entropy_estimates = composed_flow(initial_entropies, init_zs,
+                                                   output_weights, transform_weights, biases, callback)
+        return samples, entropy_estimates
+
+    return flow_sample, parser
+

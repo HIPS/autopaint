@@ -28,8 +28,8 @@ if __name__ == '__main__':
     sampler_learn_rate = 1e-2
 
 
-    D = 2
-    maxD = 200
+    D = 200
+    maxD = 400
     scale_list = []
     d_list = []
     while D < maxD:

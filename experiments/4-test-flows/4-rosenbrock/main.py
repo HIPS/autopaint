@@ -6,8 +6,8 @@ import time
 
 from autopaint.flows import build_flow_sampler
 from autopaint.plotting import plot_density
-from autopaint.util import build_logprob_mvn, log_inv_rosenbrock
-
+from autopaint.util import build_logprob_mvn, log_inv_rosenbrock, log_tapered_inv_rosenbrock
+from autopaint.optimizers import adam
 
 cov = np.array([[1.0, 0.9], [0.9, 1.0]])
 pinv = np.linalg.pinv(cov)
@@ -22,20 +22,19 @@ if __name__ == '__main__':
     t0 = time.time()
     rs = np.random.npr.RandomState(0)
 
-    num_samples = 500
-    num_steps = 32
+    num_samples = 50
+    num_steps = 10
     num_sampler_optimization_steps = 400
-    sampler_learn_rate = 1e-2
 
     D = 2
     init_mean = np.zeros(D)
-    init_log_stddevs = np.log(0.1*np.ones(D))
+    init_log_stddevs = np.log(10*np.ones(D))
     init_output_weights = 0.1*rs.randn(num_steps, D)
     init_transform_weights = 0.1*rs.randn(num_steps, D)
     init_biases = 0.1*rs.randn(num_steps)
 
     #logprob_mvn = build_logprob_mvn(mean=np.array([0.2,0.4]), cov=np.array([[1.0,0.9], [0.9,1.0]]))
-    flow_sample, parser = build_flow_sampler(log_inv_rosenbrock, D, num_steps)
+    flow_sample, parser = build_flow_sampler(log_tapered_inv_rosenbrock, D, num_steps)
 
     sampler_params = np.zeros(len(parser))
     parser.put(sampler_params, 'mean', init_mean)
@@ -54,10 +53,10 @@ if __name__ == '__main__':
     ml_and_grad = value_and_grad(get_batch_marginal_likelihood_estimate)
 
     # Optimize Langevin parameters.
-    for i in xrange(num_sampler_optimization_steps):
-        ml, dml = ml_and_grad(sampler_params)
+    def print_ml(ml,params):
         print "log marginal likelihood:", ml
-        sampler_params = sampler_params + sampler_learn_rate * dml
+    final_params, final_value = adam(ml_and_grad,sampler_params,num_sampler_optimization_steps,callback=print_ml)
+
 
     t1 = time.time()
     print "total runtime", t1-t0

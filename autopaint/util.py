@@ -155,6 +155,15 @@ def entropy_of_a_diagonal_gaussian(stddevs):
     D = len(stddevs)
     return 0.5 * D * (1.0 + np.log(2*np.pi)) + np.sum(np.log(stddevs))
 
+
+def entropy_of_diagonal_gaussians(stddevs_mat):
+    #Returns entropy of several different diagonal gaussians
+    if len(stddevs_mat.shape) == 1:
+        stddevs_mat = np.atleast_2d(stddevs_mat)
+    D = stddevs_mat.shape[1]
+    return 0.5 * D * (1.0 + np.log(2*np.pi)) + np.sum(np.log(stddevs_mat),axis = 1)
+
+
 def entropy_of_a_spherical_gaussian(stddev, D):
     return 0.5 * D * (1.0 + np.log(2*np.pi)) + D * np.log(stddev)
 
@@ -213,6 +222,7 @@ def sum_entropy_lower_bound(entropy_a, entropy_b, D):
     https://en.wikipedia.org/wiki/Entropy_power_inequality"""
     return 0.5 * D * np.logaddexp(2.0 * entropy_a / D, 2.0 * entropy_b / D)
 
+
 def neg_kl_diag_normal(mu,sig):
     #Computes of the -1 * kl divergence of a diagonal gaussians vs a normal gaussian
     #Takes in an nxd vectors of means and diagonal covariances
@@ -223,3 +233,8 @@ def neg_kl_diag_normal(mu,sig):
     kl_vect = .5*kl_vect
     return kl_vect
 
+def binarized_loglike(pred_probs,T):
+    label_probabilities =  pred_probs* T + (1 - pred_probs) * (1 - T)
+    #TODO: Mean or sum?
+    ll_vect = np.sum(label_probabilities,axis = 1)
+    return np.mean(ll_vect)

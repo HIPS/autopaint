@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 from autopaint.plotting import *
 from autopaint.langevin import build_langevin_sampler
-from autopaint.util import log_inv_rosenbrock
+from autopaint.util import log_tapered_inv_rosenbrock
 from autopaint.optimizers import adam
 
 def plot_sampler_params(params, filename):
@@ -51,21 +51,20 @@ if __name__ == '__main__':
 
     t0 = time.time()
 
-    num_samples = 4
-    num_langevin_steps = 2
-    num_sampler_optimization_steps = 1
-    sampler_learn_rate = 1e-1
+    num_samples = 50
+    num_langevin_steps = 10
+    num_sampler_optimization_steps = 400
 
-    D = 2
+    D = 200
 
     init_mean = np.zeros(D)
-    init_log_stddevs = np.log(1.0*np.ones(D))
+    init_log_stddevs = np.log(1e-4*np.ones(D))
     init_log_stepsizes = np.log(0.1*np.ones(num_langevin_steps))
     init_log_noise_sizes = np.log(0.1*np.ones(num_langevin_steps))
 
     rs = np.random.npr.RandomState(0)
 
-    sample_and_run_langevin, parser = build_langevin_sampler(log_inv_rosenbrock, D, num_langevin_steps, approx=False)
+    sample_and_run_langevin, parser = build_langevin_sampler(log_tapered_inv_rosenbrock, D, num_langevin_steps, approx=True)
 
     sampler_params = np.zeros(len(parser))
     parser.put(sampler_params, 'mean', init_mean)
@@ -76,7 +75,7 @@ if __name__ == '__main__':
     def get_batch_marginal_likelihood_estimate(sampler_params):
         samples, loglik_estimates, entropy_estimates = sample_and_run_langevin(sampler_params, rs, num_samples)
         marginal_likelihood_estimates = loglik_estimates + entropy_estimates
-        # print "mean loglik:", np.mean(loglik_estimates), " mean entropy:", np.mean(entropy_estimates)
+        print "mean loglik:", np.mean(loglik_estimates).value, " mean entropy:", np.mean(entropy_estimates).value
         plot_density(samples.value, "approximating_dist.png")
         return np.mean(marginal_likelihood_estimates)
 

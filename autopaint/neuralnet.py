@@ -1,9 +1,11 @@
+import time
 import autograd.numpy as np
 import autograd.numpy.random as npr
 from autograd.scipy.misc import logsumexp
 from autograd import grad
 from autograd.util import quick_grad_check
 from autopaint.util import sigmoid,build_logprob_mvn
+
 
 
 # Network parameters   TODO: move these into experiment scripts.
@@ -67,8 +69,10 @@ def make_binarized_nn_funs(layer_sizes, L2_reg):
 
     def likelihood(W_vect, X, T):
         pred_probs = predict_fun(W_vect,X)
-        label_probabilities =  pred_probs* T + (1 - pred_probs) * (1 - T)
-        return np.sum(label_probabilities)
+        label_probabilities =  np.log(pred_probs)* T + np.log((1 - pred_probs))* (1 - T)
+        #TODO: Mean or sum?
+        ll_vect = np.sum(label_probabilities,axis = 1)
+        return np.mean(ll_vect)
 
     return N, predict_fun, likelihood
 
@@ -97,10 +101,10 @@ def make_gaussian_nn_funs(layer_sizes, L2_reg):
         mu,log_sig = predict_fun(W_vect,X)
         N = mu.shape[0]
         #TODO: Vectorize
-        sum_logprobs = 0
+        sum_logprobs = 0.0
         for i in xrange(N):
             curMu = mu[i,:]
-            curCov = np.diag(np.exp(log_sig[i,:]))
+            curCov = np.diag(np.exp(log_sig[i,:])**2)
             cur_log_prob = build_logprob_mvn(curMu,curCov,pseudo_inv=False)
             sum_logprobs = sum_logprobs + cur_log_prob(T[i,:])
         return sum_logprobs/N

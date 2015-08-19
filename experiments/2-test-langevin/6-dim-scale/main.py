@@ -11,7 +11,7 @@ from autograd import grad
 import matplotlib.pyplot as plt
 
 from autopaint.plotting import *
-from autopaint.inference import build_langevin_sampler
+from autopaint.langevin import build_langevin_sampler
 from autopaint.util import log_inv_rosenbrock
 from autopaint.optimizers import adam
 
@@ -51,13 +51,13 @@ if __name__ == '__main__':
 
     t0 = time.time()
 
-    num_samples = 50
-    num_langevin_steps = 5
+    num_samples = 4
+    num_langevin_steps = 2
     num_sampler_optimization_steps = 1
     sampler_learn_rate = 1e-1
 
     D = 2
-    maxD = 64
+    maxD = 256
     scale_list = []
     d_list = []
     while D < maxD:
@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
         rs = np.random.npr.RandomState(0)
 
-        sample_and_run_langevin, parser = build_langevin_sampler(log_inv_rosenbrock, D, num_langevin_steps, approx=False)
+        sample_and_run_langevin, parser = build_langevin_sampler(log_inv_rosenbrock, D, num_langevin_steps, approx=True)
 
         sampler_params = np.zeros(len(parser))
         parser.put(sampler_params, 'mean', init_mean)
@@ -101,7 +101,7 @@ if __name__ == '__main__':
         scale_list.append(endOpt-startOpt)
         d_list.append(D)
         #Update D
-        D = D+10
+        D = D+20
 
     y = np.asarray(scale_list)
     x = np.asarray(d_list)
