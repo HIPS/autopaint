@@ -1,33 +1,13 @@
 # Main demo script
 import autograd.numpy as np
 from autograd import value_and_grad
-import numpy.linalg
 import time
 
 from autopaint.flows import build_flow_sampler,build_batch_flow_sampler
 from autopaint.plotting import plot_density
-from autopaint.util import build_logprob_mvn
 from autopaint.neuralnet import make_batches
 from autopaint.aevb import build_encoder,build_gaussian_decoder
 from autopaint.optimizers import adam_mini_batch, sga_mini_batch
-
-def logprob_two_moons(z):
-    z1 = z[:, 0]
-    z2 = z[:, 1]
-    return (- 0.5 * ((np.sqrt(z1**2 + z2**2) - 2 ) / 0.4)**2\
-            + np.logaddexp(-0.5 * ((z1 - 2) / 0.6)**2, -0.5 * ((z1 + 2) / 0.6)**2))
-
-def logprob_wiggle(z):
-    z1 = z[:, 0]
-    z2 = z[:, 1]
-    return -0.5 * (z2 - np.sin(2.0 * np.pi * z1 / 4.0) / 0.4 )**2 - 0.2 * (z1**2 + z2**2)
-
-cov = np.array([[1.0, 0.9], [0.9, 1.0]])
-pinv = np.linalg.pinv(cov)
-(sign, logdet) = numpy.linalg.slogdet(cov)
-const =  -0.5 * 2 * np.log(2*np.pi) - 0.5 * logdet
-def logprob_mvn(z):
-    return const - 0.5 * np.dot(np.dot(z.T, pinv), z)
 
 
 if __name__ == '__main__':
@@ -40,7 +20,7 @@ if __name__ == '__main__':
     #Create aevb function
     # Training parameters
     param_scale = 0.1
-    samples_per_image = 10
+    samples_per_image = 1
     latent_dimensions = 10
     hidden_units = 50
     D = train_images.shape[1]
@@ -82,36 +62,41 @@ if __name__ == '__main__':
     batch_idxs = make_batches(train_images.shape[0], batch_size)
 
 
-    def get_batch_marginal_likelihood_estimate(sampler_params,idxs):
-        #Create function to compute lower_bound
-        def get_batch_lower_bound(sampler_params):
-            #Create an initial encoding of sample images:
-            enc_w = parser.get(sampler_params,'enc_w')
-            (mus,log_sigs) = encoder(enc_w,train_images[idxs])
-            #Take mean of encodings and sigs and use this to generate samples, should return only entropy
-            samples, entropy_estimates = flow_sample(sampler_params, mus, np.exp(log_sigs),rs, samples_per_image)
-            #From samples decode them and compute likelihood
-            dec_w = parser.get(sampler_params,'dec_w')
-            train_images_repeat = np.repeat(train_images[idxs],samples_per_image,axis=0)
-            loglike = decoder_log_like(dec_w,samples,train_images_repeat)
-            print "Mean loglik:", loglike.value,\
-            "Mean entropy:", np.mean(entropy_estimates.value)
-            #Create some samples from x:
-            (xs_mu,xs_log_sigs) = decoder(dec_w, samples)
-            # plot_density(xs_mu.value, "approximating_dist.png")
-            return np.mean(entropy_estimates)
-            print np.mean(entropy_estimates)+loglike
-            return np.mean(entropy_estimates)+loglike
+    def get_batch_marginal_likelihood_estimate(sampler_params):
+        samples, likelihood_estimates, entropy_estimates = flow_sample(sampler_params, rs, num_samples)
+        print "Mean loglik:", np.mean(likelihood_estimates.value),\
+              "Mean entropy:", np.mean(entropy_estimates.value)
+        plot_density(samples.value, "approximating_dist.png")
+        return np.mean(likelihood_estimates + entropy_estimates)
 
-        #Take gradient
-        lb_val_grad = value_and_grad(get_batch_lower_bound)
-        return lb_val_grad(sampler_params)
+    ml_and_grad = value_and_grad(get_batch_marginal_likelihood_estimate)
+
+    def get_batch_lower_bound(cur_sampler_params, idxs):
+        #Create an initial encoding of sample images:
+        enc_w = parser.get(cur_sampler_params,'enc_w')
+        (mus,log_sigs) = encoder(enc_w,train_images[idxs])
+        #Take mean of encodings and sigs and use this to generate samples, should return only entropy
+        samples, entropy_estimates = flow_sample(cur_sampler_params, mus, np.exp(log_sigs),rs, samples_per_image)
+        #From samples decode them and compute likelihood
+        dec_w = parser.get(cur_sampler_params,'dec_w')
+        train_images_repeat = np.repeat(train_images[idxs],samples_per_image,axis=0)
+        loglike = decoder_log_like(dec_w,samples,train_images_repeat)
+        print "Mean loglik:", loglike.value,\
+        "Mean entropy:", np.mean(entropy_estimates.value)
+        #Create some samples from x:
+        (xs_mu,xs_log_sigs) = decoder(dec_w, samples)
+        # plot_density(xs_mu.value, "approximating_dist.png")
+        return np.mean(entropy_estimates)
+        #print np.mean(entropy_estimates)+loglike
+        #return np.mean(entropy_estimates)+loglike
+
+    lb_val_grad = value_and_grad(get_batch_lower_bound)
 
     def print_ml(ml,weights,grad):
         print "log marginal likelihood:", ml
 
 
-    final_params, final_value = adam_mini_batch(get_batch_marginal_likelihood_estimate,sampler_params,batch_idxs,num_epochs,callback=print_ml)
+    final_params, final_value = adam_mini_batch(lb_val_grad,sampler_params,batch_idxs,num_epochs,callback=print_ml)
 
 
     t1 = time.time()
