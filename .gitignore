@@ -10,6 +10,7 @@ paper/*.blg
 
 autopaint/data
 
+.idea
 .idea/
 
 # Byte-compiled / optimized / DLL files
