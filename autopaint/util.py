@@ -107,7 +107,6 @@ def build_logprob_mvn(mean, cov,pseudo_inv = True):
         if len(z.shape) == 1 or z.shape[0] == 1:
             return const - 0.5*np.dot(np.dot(z_minus_mean,pinv),z_minus_mean.T)
         else:
-            print 'correct'
             return const - 0.5 * np.einsum('ij,jk,ik->i', z_minus_mean, pinv, z_minus_mean)
 
     return logprob

@@ -9,7 +9,7 @@ from autopaint.plotting import plot_density
 from autopaint.util import build_logprob_mvn
 from autopaint.neuralnet import make_batches
 from autopaint.aevb import build_encoder,build_gaussian_decoder
-from autopaint.optimizers import adam_mini_batch
+from autopaint.optimizers import adam_mini_batch, sga_mini_batch
 
 def logprob_two_moons(z):
     z1 = z[:, 0]
@@ -88,29 +88,26 @@ if __name__ == '__main__':
             #Create an initial encoding of sample images:
             enc_w = parser.get(sampler_params,'enc_w')
             (mus,log_sigs) = encoder(enc_w,train_images[idxs])
-            #Take mean of encodings and sigs and use this to generate samples, should return entropy
+            #Take mean of encodings and sigs and use this to generate samples, should return only entropy
             samples, entropy_estimates = flow_sample(sampler_params, mus, np.exp(log_sigs),rs, samples_per_image)
             #From samples decode them and compute likelihood
             dec_w = parser.get(sampler_params,'dec_w')
             train_images_repeat = np.repeat(train_images[idxs],samples_per_image,axis=0)
-            print samples.shape
-            print train_images_repeat.shape
             loglike = decoder_log_like(dec_w,samples,train_images_repeat)
             print "Mean loglik:", loglike.value,\
             "Mean entropy:", np.mean(entropy_estimates.value)
             #Create some samples from x:
             (xs_mu,xs_log_sigs) = decoder(dec_w, samples)
-
-            plot_density(xs_mu.value, "approximating_dist.png")
+            # plot_density(xs_mu.value, "approximating_dist.png")
+            return np.mean(entropy_estimates)
             print np.mean(entropy_estimates)+loglike
             return np.mean(entropy_estimates)+loglike
 
         #Take gradient
         lb_val_grad = value_and_grad(get_batch_lower_bound)
-        print lb_val_grad(sampler_params)
         return lb_val_grad(sampler_params)
 
-    def print_ml(ml,weights):
+    def print_ml(ml,weights,grad):
         print "log marginal likelihood:", ml
 
 

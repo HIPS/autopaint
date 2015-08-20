@@ -18,7 +18,8 @@ def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,sample
     mean_kl = compute_kl(enc_w,train_images,encode)
     print "ll average", mean_log_prob.value
     print "kl average", mean_kl.value
-    return  mean_log_prob + mean_kl
+    return  \
+        mean_log_prob + mean_kl
 
 def compute_log_prob(enc_w,dec_w,encode,decode_log_like,train_images,samples_per_image,latent_dimensions,rs):
     (mus,log_sigs) = encode(enc_w,train_images)
@@ -88,7 +89,7 @@ def run_aevb(train_images):
         num_samples = 100
         images_per_row = 10
         z = rs.randn(num_samples,latent_dimensions)
-        samples = decoder(dec_w,z)
+        samples = np.round(decoder(dec_w,z))
         fig = plt.figure(1)
         fig.clf()
         ax = fig.add_subplot(111)
@@ -97,7 +98,7 @@ def run_aevb(train_images):
 
         return val_and_grad_func(weights)
 
-    def print_ml(ml,weights):
+    def print_ml(ml,weights,grad):
         print "log marginal likelihood:", ml
 
     final_params, final_value = adam_mini_batch(batch_value_and_grad,weights,batch_idxs,num_epochs,callback=print_ml)
