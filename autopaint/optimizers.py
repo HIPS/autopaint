@@ -9,7 +9,7 @@ def sga(value_and_grad,params,num_iters, alpha = .001,callback = None):
         if callback:
             callback(val,params,grad)
         params = params + alpha * grad
-    val = value_and_grad(params)
+    val, grad = value_and_grad(params)
     return params,val
 
 def sga_mini_batch(batch_value_and_grad,params,batch_idxs,num_epochs, alpha = .001,callback = None):
@@ -45,7 +45,7 @@ def adam(value_and_grad,params,num_iters, alpha = .001, beta1 = .9,beta2 = .999,
         params = params + alpha * mhat/(np.sqrt(vhat)+eps)
         end = time.time()
         print 'time per iter:', end - start
-    val = value_and_grad(params)
+    val, grad = value_and_grad(params)
     return params,val
 
 
@@ -105,5 +105,5 @@ def ada_delta(value_and_grad,params,num_iters, rho = .001, eps = 1e-8,callback =
         d = np.sqrt(d_sq+eps)/np.sqrt(g_sq+eps)*grad
         d_sq = rho*d_sq + (1-rho)*d**2
         params = params+d
-    val = value_and_grad(params)
-    return params,val
+    val, grad = value_and_grad(params)
+    return params, val

@@ -68,6 +68,7 @@ def build_batch_flow_sampler(D, num_steps,batch_size):
         initial_entropies = np.reshape(initial_entropies,(num_samples*batch_size),order = 'F')
         noise = rs.randn(D, batch_size,num_samples)
         init_zs = mean + noise * stddevs
+        assert init_zs.shape == (D, batch_size, num_samples)
         init_zs = np.reshape(init_zs, (batch_size*num_samples,D),order = 'F')
         samples, entropy_estimates = composed_flow(initial_entropies, init_zs,
                                                    output_weights, transform_weights, biases, callback)
