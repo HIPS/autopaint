@@ -1,3 +1,4 @@
+import pickle
 import autograd.numpy as np
 from scipy.linalg import sqrtm
 # from autograd.scipy.special import gammaln
@@ -136,6 +137,21 @@ def build_logprob_standard_normal(D):
         return const - 0.5 * np.einsum('ij,ij->i', z, z)
     return logprob
 
+def sample_from_normal_bimodal(mean1,mean2,num_samples,rs):
+    D = len(mean1)
+    samples = np.zeros((num_samples,D))
+    for i in xrange(num_samples):
+        z = rs.randn()
+        noise = rs.randn(D)
+        if z < .5:
+            samples[i,:] = mean1+noise
+        else:
+            samples[i,:] = mean2+noise
+    return samples
+
+
+
+
 def build_unwhitener(mean, cov):
     """Builds a function that takes in a draw from a standard normal, and
        turns it into a draw from a MVN with mean, cov."""
@@ -237,3 +253,11 @@ def binarized_loglike(pred_probs,T):
     #TODO: Mean or sum?
     ll_vect = np.sum(label_probabilities,axis = 1)
     return np.mean(ll_vect)
+
+def load_and_pickle_binary_mnist():
+    N_data, train_images, train_labels, test_images, test_labels = load_mnist()
+    train_images = np.round(train_images)
+    test_images = np.round(test_images)
+    mnist_data = N_data, train_images, train_labels, test_images, test_labels
+    with open('mnist_binary_data.pkl', 'w') as f:
+        pickle.dump(mnist_data, f, 1)

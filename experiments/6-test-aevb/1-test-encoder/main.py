@@ -8,15 +8,15 @@ import autograd.numpy as np
 from autograd import value_and_grad
 
 from autopaint.plotting import plot_images
-from autopaint.optimizers import adam_mini_batch
+from autopaint.optimizers import adam_mini_batch,ada_grad_mini_batch,ada_delta_mini_batch
 from autopaint.neuralnet import make_batches
 from autopaint.util import load_mnist
 from autopaint.aevb import build_encoder, build_binarized_decoder, lower_bound
-from autopaint.util import WeightsParser
+from autopaint.util import WeightsParser, load_and_pickle_binary_mnist
 
 param_scale = 0.1
-samples_per_image = 5
-latent_dimensions = 20
+samples_per_image = 1
+latent_dimensions = 2
 hidden_units = 500
 
 def run_aevb(train_images):
@@ -34,7 +34,7 @@ def run_aevb(train_images):
     N_weights_dec, decoder, decoder_log_like = build_binarized_decoder(dec_layers)
 
     # Optimize aevb
-    batch_size = 256
+    batch_size = 100
     num_epochs = 160
     rs = npr.RandomState(0)
 
@@ -78,17 +78,11 @@ def run_aevb(train_images):
     print "total runtime", finish_time - start_time
 
 
-def load_and_pickle_binary_mnist():
-    N_data, train_images, train_labels, test_images, test_labels = load_mnist()
-    train_images = np.round(train_images)
-    test_images = np.round(test_images)
-    mnist_data = N_data, train_images, train_labels, test_images, test_labels
-    with open('mnist_binary_data.pkl', 'w') as f:
-        pickle.dump(mnist_data, f, 1)
+
 
 if __name__ == '__main__':
-    #load_and_pickle_binary_mnist()
-    with open('mnist_binary_data.pkl') as f:
+    # load_and_pickle_binary_mnist()
+    with open('../../../autopaint/mnist_binary_data.pkl') as f:
         N_data, train_images, train_labels, test_images, test_labels = pickle.load(f)
 
     decoder = run_aevb(train_images)

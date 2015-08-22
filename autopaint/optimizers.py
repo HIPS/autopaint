@@ -107,3 +107,24 @@ def ada_delta(value_and_grad,params,num_iters, rho = .001, eps = 1e-8,callback =
         params = params+d
     val, grad = value_and_grad(params)
     return params, val
+
+def ada_delta_mini_batch(batch_value_and_grad,params,batch_idxs,num_epochs, rho = .001, eps = 1e-8,callback = None):
+    # Maximizes a stochastic function using adagrad in minibatch
+    # batch_value_and_grad is a function that returns the value and gradient of the function at params at idxs in batch_idx
+    D = len(params)
+    g_sq = np.zeros(D)
+    d_sq = np.zeros(D)
+    for i in xrange(num_epochs):
+        for idxs in batch_idxs:
+            start = time.time()
+            val, grad = batch_value_and_grad(params,idxs)
+            if callback:
+                callback(val,params,grad)
+            g_sq = rho*g_sq + (1-rho)*grad**2
+            d = np.sqrt(d_sq+eps)/np.sqrt(g_sq+eps)*grad
+            d_sq = rho*d_sq + (1-rho)*d**2
+            params = params+d
+            end = time.time()
+            print 'time per iter:', end - start
+    val, grad = batch_value_and_grad(params,idxs)
+    return params,val

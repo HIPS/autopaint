@@ -51,7 +51,6 @@ def build_flow_sampler(loglik_func, D, num_steps):
 
     return flow_sample, parser
 
-
 def build_batch_flow_sampler(D, num_steps,batch_size):
 
     parser = WeightsParser()
@@ -64,11 +63,13 @@ def build_batch_flow_sampler(D, num_steps,batch_size):
         transform_weights = parser.get(params, 'transform weights')
         biases = parser.get(params, 'biases')
 
-        initial_entropies = np.full((num_samples,batch_size), entropy_of_diagonal_gaussians(stddevs))
-        initial_entropies = np.reshape(initial_entropies,(num_samples*batch_size),order = 'F')
-        noise = rs.randn(D, batch_size,num_samples)
+        # initial_entropies2 = np.full((num_samples,batch_size), entropy_of_diagonal_gaussians(stddevs))
+        # initial_entropies2 = np.reshape(initial_entropies2,(num_samples*batch_size),order = 'F')
+        initial_entropies = entropy_of_diagonal_gaussians(stddevs)
+        # assert np.array_equal(initial_entropies,initial_entropies2)
+        noise = rs.randn(num_samples, batch_size,D)
         init_zs = mean + noise * stddevs
-        assert init_zs.shape == (D, batch_size, num_samples)
+        assert init_zs.shape == noise.shape
         init_zs = np.reshape(init_zs, (batch_size*num_samples,D),order = 'F')
         samples, entropy_estimates = composed_flow(initial_entropies, init_zs,
                                                    output_weights, transform_weights, biases, callback)
