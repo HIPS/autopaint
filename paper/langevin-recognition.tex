@@ -91,7 +91,8 @@
    \or \ddagger\ddagger \else\@ctrerr\fi}}
 \makeatother
 
-\title{Langevin Flow for Gradient-based Nonparametric Variational Inference}
+%\title{Langevin Flow for Gradient-based Nonparametric Variational Inference}
+\title{Langevin Nonparametric Variational Inference: Stochastic Gradient-based Approximation}
 
 \author{}
 
@@ -111,19 +112,57 @@ These properties make the Langevin flow sampler suitable for inference in high-d
 \section{Introduction}
 
 [cite Shakir and Danilo] introduced the idea of using Langevin flows as an approximating family, but did not propose a lower bound.
-[Maclaurin et al] developed a scalable unbiased lower bound estimate for the entropy implicitly defined by stochastic gradient descent dynamics.
+\citet{MacDuvAda2015hyper} developed a scalable unbiased lower bound estimate for the entropy implicitly defined by stochastic gradient descent dynamics.
 We combine this bound with the entropy power inequality [cite] to extend it to the case where noise is added at each step.
+
+Our method can be seen as a special case of \citet{Bridging14}, who showed that any set of stochastic dynamics, even those not satisfying detailed balance, can be used to implicitly define a variational distribution.
+However, to provide a tight variational bound, one needs to estimate the entropy of the resulting implicit distribution.
+\citet{Bridging14} do this by defining an inverse model which estimates backwards transition probabilities, and then optimizes this model in an outer loop.
+In contrast, our estimate of the entropy has a simple fixed form, and is tight in the limit of small step-sizes.
+
+
+\section{Langevin Flow}
+\label{sec:techintro}
+Variational inference \citep{wainwright2008graphical} aims to approximate an intractable posterior distribution, $\posterior$, with another more tractable distribution, $q(\params)$.
+
+\begin{align}
+\log p(\data)
+& \geq - \underbrace{\expectargs{q(\params)}{ -\log \jointdist }}_{\textnormal{\normalsize Energy $E[q]$}}
+         \underbrace{- \expectargs{q(\params)}{\log  q(\params)}}_{\textnormal{\normalsize Entropy $S[q]$}} \nonumber \\
+& := \varL[q] \label{eq:varbound}
+\end{align}
+%
 
 \begin{figure}
 \centerline{\includegraphics[height=0.34\textwidth, height=0.4\textwidth]{../montage/two_moons_density.png}
 \hspace{2em}
 \includegraphics[height=0.4\textwidth, height=0.4\textwidth]{../experiments/4-test-flows/2-langevin/approximating_dist.png}}
 \caption{\emph{Left}: Two moons toy density.
-\emph{Right}: Samples from Langevin flows approximating density.}
+\emph{Right}: Samples from Langevin flows approximating density.
+TODO: Show better approximating dists as we increase the number of steps.}
 \label{fig:toy examples}
 \end{figure}
 
-\section{Langevin Flow}
+As shown in (\ref{eq:varbound}), $\varL$ consists of an energy term and an entropy term.
+The energy term measures how well~$q$ fits the data and the entropy term encourages the probability mass of~$q$ to spread out, preventing overfitting.
+
+%
+\begin{align}
+S[q_{t+1}] - S[q_t] =
+  \expect_{q_t(\params_t)} \big[ \log
+    \left| J(\params_t) \right| \big] \,.
+\end{align}
+%
+Note that this analysis assumes that the mapping $T$ is bijective.
+Combining these terms, we have an unbiased estimator of $\varL$ at iteration $T$,
+based on the sequence of parameters, $\params_0, \ldots, \params_T$, from a single training run:
+\begin{align}
+\varL[q_T] \approx
+  \underbrace{\log \subjointdist{}{T}}_{\textnormal{\normalsize Energy}} +
+  \underbrace{\sum_{t=0}^{T-1} \log \left| J(\params_t) \right| + S[q_0]}_{\textnormal{\normalsize Entropy}} \,.
+\label{eq:entropy-bound}
+\end{align}
+
 
 [Note: we can also use Langevin flow with SGD, while Betancourt's paper implies that we can't use HMC very effectively with stochastic gradients.  So we could use it for doubly-intractable distributions where we only get stochastic estimates of the likelihood.]
 
@@ -146,6 +185,44 @@ We combine this bound with the entropy power inequality [cite] to extend it to t
    \State \textbf{output} sample $\params_T$, entropy estimate $\entropy_T$
 \end{algorithmic}
 \end{algorithm}
+
+
+
+\subsection{Estimating the Jacobian in high dimensions}
+\label{sec:scalable-estimator}
+The expression for the change in entropy given by (\ref{eq:exact hessian}) is impractical for large-scale problems since it requires an~$\bigo{D^3}$ determinant computation.
+Fortunately, we can make a good approximation using just one or two Hessian-vector products, which can usually be performed in~$\bigo{D}$ time using reverse-mode differentiation \citep{pearlmutter1994fast}.
+
+The idea is that since~$\stepsize\lambda_{\text{max}}$ is small, the Jacobian is actually just a small perturbation to the identity and we can approximate its determinant using traces as follows:
+%
+\begin{align}
+\log \left| I - \stepsize H \right|
+& =    \sum_{i=0}^D \log\left(1 - \stepsize\lambda_i\right) \nonumber\\
+& \geq \sum_{i=0}^D \left[- \stepsize\lambda_i 
+                        - (\stepsize\lambda_i)^2 \right] \label{eq:logbound} \\
+& = - \stepsize \trace{H} - \stepsize^2 \trace{HH}\,.
+\end{align}
+%
+The bound in (\ref{eq:logbound}) is just a second order Taylor expansion of~$\log(1 - x)$ about~${x = 0}$ and is valid if ${\stepsize\lambda_i < 0.68}$.
+As we argue above, the regime in which SGD is stable requires that $\stepsize\lambda_{\text{max}} < 1$, so again choosing a conservative learning rate keeps this bound in the correct direction.
+For sufficiently small learning rates, this bound becomes tight.
+
+\begin{algorithm}[t]
+   \caption{linear-time estimate of log-determinant of Jabobian of one iteration of stochastic gradient descent}
+   \label{alg:fast-logdet-estimate}
+\begin{algorithmic}[1]
+	\State {\bfseries input:}
+	step size $\stepsize$, current parameter vector $\params$,
+	twice-differentiable negative log-likelihood $L(\params)$
+	\State {\bfseries initialize} $\vr_0 \sim \N{0}{\sigma_0 \vI_D}$
+	\State $\vr_1 = \vr_0 - \stepsize \vr_0\tra \nabla \nabla L(\params, t)$
+	\State $\vr_2 = \vr_1 - \stepsize \vr_1\tra \nabla \nabla L(\params, t)$
+	\State $\hat \varL = \vr_0\tra \left( -2 \vr_0 + 3 \vr_1 - \vr_2 \right)$
+    \State \textbf{output} $\hat \varL$, an unbiased estimate of a parabolic lower bound on the change in entropy.
+\end{algorithmic}
+\end{algorithm}
+
+
 
 
 \section{Experiments}
@@ -177,6 +254,8 @@ This package handles standard Numpy~\citep{oliphant2007python} code, and can dif
 Code for all experiments is available at \url{github.com/HIPS/autopaint}.
 
 \section{Limitations}
+\label{sec:limitations}
+
 %In this section we detail some limitations of the neural fingerprint architecture used in this paper.
 
 \paragraph{Computational cost}
@@ -192,6 +271,14 @@ Both HMC and Langevin flows require gradient evaluation of $p(x,z)$ at every ste
 \paragraph{Unrolled inference algorithms}
 \citet{hershey2014deep} and others have noted that iterative inference procedures sometimes resemble the feedforward computation of a recurrent neural network.
 One natural extension of these ideas is to parameterize each inference step, and train a neural network to approximately match the output of exact inference using only a small number of iterations.
+
+\paragraph{Gradient-based hyperparameter optimization}
+
+
+
+
+\section{Future work and extensions}
+
 
 
 \section{Conclusion}
