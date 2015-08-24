@@ -39,7 +39,7 @@ def make_classification_nn(layer_sizes):
     return num_weights, make_predictions, likelihood
 
 
-def make_binarized_nn_funs(layer_sizes):
+def make_binary_nn(layer_sizes):
     """Outputs are in [0,1]^D and the labels are {0,1}^D"""
     num_weights, compute_hiddens = make_nn_funs(layer_sizes)
 
@@ -55,7 +55,7 @@ def make_binarized_nn_funs(layer_sizes):
     return num_weights, make_predictions, likelihood
 
 
-def make_gaussian_nn_funs(layer_sizes):
+def make_gaussian_nn(layer_sizes):
     """Outputs a Guassian."""
     num_weights, compute_hiddens = make_nn_funs(layer_sizes)
     D = layer_sizes[-1] / 2

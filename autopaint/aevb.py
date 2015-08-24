@@ -1,7 +1,5 @@
 import autograd.numpy as np
 from autopaint.util import neg_kl_diag_normal
-from autopaint.neuralnet import make_gaussian_nn_funs, make_binarized_nn_funs
-
 
 def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,samples_per_image,latent_dimensions,rs):
     enc_w = weights[0:N_weights_enc]
@@ -28,15 +26,4 @@ def compute_kl(enc_w,train_images,encode):
     kl_vect = neg_kl_diag_normal(mus,sigs)
     return np.mean(kl_vect)
 
-def build_encoder(enc_layers):
-    N_weights, predict_fun, log_likelihood = make_gaussian_nn_funs(enc_layers)
-    return N_weights,predict_fun
-
-def build_gaussian_decoder(dec_layers):
-    N_weights, predict_fun, log_likelihood = make_gaussian_nn_funs(dec_layers)
-    return N_weights, predict_fun,log_likelihood
-
-def build_binarized_decoder(dec_layers):
-    N_weights, predict_fun, log_likelihood = make_binarized_nn_funs(dec_layers)
-    return N_weights, predict_fun,log_likelihood
 

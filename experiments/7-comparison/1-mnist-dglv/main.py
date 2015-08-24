@@ -7,8 +7,7 @@ import autograd.numpy as np
 from autograd import grad
 
 from autopaint.flows import build_flow_sampler
-from autopaint.neuralnet import make_batches
-from autopaint.aevb import build_encoder, build_binarized_decoder
+from autopaint.neuralnet import make_batches, make_gaussian_nn, make_binary_nn
 from autopaint.optimizers import adam
 from autopaint.util import load_and_pickle_binary_mnist, WeightsParser
 from autopaint.plotting import plot_images
@@ -43,8 +42,8 @@ if __name__ == '__main__':
     enc_layer_sizes = [D, hidden_units, 2 * latent_dimension]
     dec_layer_sizes = [latent_dimension, hidden_units, D]
 
-    N_weights_enc, encoder = build_encoder(enc_layer_sizes)
-    N_weights_dec, decoder, decoder_log_like = build_binarized_decoder(dec_layer_sizes)
+    N_weights_enc, encoder, _ = make_gaussian_nn(enc_layer_sizes)
+    N_weights_dec, decoder, decoder_log_like = make_binary_nn(dec_layer_sizes)
 
     # Optimization parameters.
     batch_size = 100
