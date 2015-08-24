@@ -77,7 +77,8 @@ if __name__ == '__main__':
         samples, entropy_estimates = flow_sampler(flow_params, mus, np.exp(log_sigs), rs)
         loglikes = decoder_log_like(decoder_weights, samples, cur_data)
 
-        print "Iter", iter, "loglik:", np.mean(loglikes).value, "entropy:", np.mean(entropy_estimates).value
+        print "Iter", iter, "loglik:", np.mean(loglikes).value, \
+            "entropy:", np.mean(entropy_estimates).value, "marg. like:", np.mean(entropy_estimates + loglikes).value
         return np.mean(entropy_estimates + loglikes)
 
     lb_grad = grad(get_batch_lower_bound)

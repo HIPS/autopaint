@@ -3,103 +3,78 @@ import autograd.numpy.random as npr
 from autograd.scipy.misc import logsumexp
 from autograd import grad
 from autograd.util import quick_grad_check
-from autopaint.util import sigmoid,build_logprob_mvn
+from autopaint.util import sigmoid
 
-# Network parameters   TODO: move these into experiment scripts.
-layer_sizes = [784, 200, 100, 10]
-L2_reg = 1.0
-
-# Training parameters
-param_scale = 0.1
-learning_rate = 1e-3
-momentum = 0.9
-batch_size = 256
-num_epochs = 50
-
-
-def make_nn_funs(layer_sizes, L2_reg):
+def make_nn_funs(layer_sizes):
     shapes = zip(layer_sizes[:-1], layer_sizes[1:])
-    N = sum((m+1)*n for m, n in shapes)
+    num_weights = sum((m+1)*n for m, n in shapes)
 
-    def unpack_layers(W_vect):
+    def unpack_layers(weights):
         for m, n in shapes:
-            yield W_vect[:m*n].reshape((m,n)), W_vect[m*n:m*n+n]
-            W_vect = W_vect[(m+1)*n:]
+            yield weights[:m*n].reshape((m,n)), weights[m*n:m*n+n]
+            weights = weights[(m+1)*n:]
 
-    def predict_fun(W_vect, inputs):
+    def compute_hiddens(weights, inputs):
         """Returns normalized log-prob of all classes."""
-        for W, b in unpack_layers(W_vect):
+        for layer, (W, b) in enumerate(unpack_layers(weights)):
             outputs = np.dot(inputs, W) + b
             inputs = np.tanh(outputs)
-        return outputs - logsumexp(outputs, axis=1, keepdims=True)
+        return outputs
 
-    def loss(W_vect, X, T):
-        log_prior = -L2_reg * np.dot(W_vect, W_vect)
-        log_lik = np.sum(predict_fun(W_vect, X) * T)
-        return - log_prior - log_lik
+    return num_weights, compute_hiddens
 
-    def likelihood(W_vect, X, T):
-        return np.sum(predict_fun(W_vect, X) * T, axis=1)
 
-    def frac_err(W_vect, X, T):
-        return np.mean(np.argmax(T, axis=1) != np.argmax(predict_fun(W_vect, X), axis=1))
+def make_classification_nn(layer_sizes):
+    """Outputs class label log-probabilities."""
+    num_weights, compute_hiddens = make_nn_funs(layer_sizes)
 
-    return N, predict_fun, loss, frac_err, likelihood
+    def make_predictions(weights, inputs):
+        """Normalize log-probabilities."""
+        hiddens = compute_hiddens(weights, inputs)
+        return hiddens - logsumexp(hiddens, axis=1, keepdims=True)
+
+    def likelihood(weights, inputs, targets):
+        return np.sum(make_predictions(weights, inputs) * targets, axis=1)
+
+    return num_weights, make_predictions, likelihood
 
 
 def make_binarized_nn_funs(layer_sizes):
-    #Like a neural net, but now our outputs are in [0,1]^D and the labels are {0,1}^D
-    shapes = zip(layer_sizes[:-1], layer_sizes[1:])
-    N = sum((m+1)*n for m, n in shapes)
+    """Outputs are in [0,1]^D and the labels are {0,1}^D"""
+    num_weights, compute_hiddens = make_nn_funs(layer_sizes)
 
-    def unpack_layers(W_vect):
-        for m, n in shapes:
-            yield W_vect[:m*n].reshape((m,n)), W_vect[m*n:m*n+n]
-            W_vect = W_vect[(m+1)*n:]
+    def make_predictions(weights, inputs):
+        return sigmoid(compute_hiddens(weights, inputs))
 
-    def predict_fun(W_vect, inputs):
-        """Probability of activation of outputs"""
-        for W, b in unpack_layers(W_vect):
-            outputs = np.dot(inputs, W) + b
-            inputs = np.tanh(outputs)
-        return sigmoid(outputs)
-
-    def likelihood(W_vect, X, T):
-        pred_probs = predict_fun(W_vect,X)
-        label_probabilities =  np.log(pred_probs)* T + np.log((1 - pred_probs))* (1 - T)
+    def likelihood(weights, inputs, targets):
+        pred_probs = make_predictions(weights, inputs)
+        label_probabilities = np.log(pred_probs)       * targets \
+                            + np.log((1 - pred_probs)) * (1 - targets)
         return np.sum(label_probabilities, axis=1)   # Sum across pixels.
 
-    return N, predict_fun, likelihood
+    return num_weights, make_predictions, likelihood
 
 
 def make_gaussian_nn_funs(layer_sizes):
-    #Like a neural net, but now our outputs are a mean and the log of a diagonal covariance matrix
-    shapes = zip(layer_sizes[:-1], layer_sizes[1:])
-    N = sum((m+1)*n for m, n in shapes)
+    """Outputs a Guassian."""
+    num_weights, compute_hiddens = make_nn_funs(layer_sizes)
+    D = layer_sizes[-1] / 2
 
-    def unpack_layers(W_vect):
-        for m, n in shapes:
-            yield W_vect[:m*n].reshape((m,n)), W_vect[m*n:m*n+n]
-            W_vect = W_vect[(m+1)*n:]
-
-    def predict_fun(W_vect, inputs):
-        """Returns the mean of a gaussian and the log of a diagonal covariance matrix """
-        for W, b in unpack_layers(W_vect):
-            outputs = np.dot(inputs, W) + b
-            inputs = np.tanh(outputs)
-        D = inputs.shape[1]/2
-        mu = outputs[:,0:D]
-        log_sig = outputs[:,D:2*D]
+    def make_predictions(weights, inputs):
+        """Returns the mean and the log of the diagonal of the covariance matrix."""
+        hiddens = compute_hiddens(weights, inputs)
+        mu = hiddens[:, 0:D]
+        log_sig = hiddens[:, D:2*D]
         return mu,log_sig
 
-    def likelihood(weights, X, T):
-        means, log_sigs = predict_fun(weights, X)
-        D = means.shape[1]
-        T_minus_mean = (T - means) / log_sigs
+    def likelihood(weights, inputs, targets):
+        means, log_sigs = make_predictions(weights, inputs)
+        normalized_targets = (targets - means) / log_sigs
         const = -0.5 * D * np.log(2*np.pi) - np.sum(log_sigs, axis=1)
-        return const - 0.5 * np.einsum('ij,ij->i', T_minus_mean, T_minus_mean)
+        return const - 0.5 * np.einsum('ij,ij->i', normalized_targets, normalized_targets)
 
-    return N, predict_fun, likelihood
+    return num_weights, make_predictions, likelihood
+
 
 one_hot = lambda x, K: np.array(x[:,None] == np.arange(K)[None, :], dtype=int)
 
@@ -126,19 +101,17 @@ def make_batches(N_data, batch_size):
             for i in range(0, N_data, batch_size)]
 
 
-def sgd(grad, x, callback=None, num_iters=200, step_size=0.1, mass=0.9):
-    """Stochastic gradient descent with momentum.
-    grad() must have signature grad(x, i), where i is the iteration number."""
-    velocity = np.zeros(len(x))
-    for i in range(num_iters):
-        g = grad(x)
-        if callback: callback(x, i, g)
-        velocity = mass * velocity - (1.0 - mass) * g
-        x = x + step_size * velocity
-    return x
-
-
 def train_nn(train_images, train_labels, test_images, test_labels):
+    # Network parameters   TODO: move these into experiment scripts.
+    layer_sizes = [784, 200, 100, 10]
+    L2_reg = 1.0
+
+    # Training parameters
+    param_scale = 0.1
+    learning_rate = 1e-3
+    momentum = 0.9
+    batch_size = 256
+    num_epochs = 50
 
     # Make neural net functions
     N_weights, predict_fun, loss_fun, frac_err, likelihood = make_nn_funs(layer_sizes, L2_reg)

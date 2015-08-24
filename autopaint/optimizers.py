@@ -1,6 +1,6 @@
 import autograd.numpy as np
 
-def sga(gradfun, params,num_iters, alpha = .001,callback = None):
+def sga(gradfun, params, num_iters, alpha=.001, callback=None):
     # Stochastic gradient ascent
     for i in xrange(num_iters):
         grad = gradfun(params, i)
@@ -8,6 +8,17 @@ def sga(gradfun, params,num_iters, alpha = .001,callback = None):
             callback(params, i, grad)
         params = params + alpha * grad
     return params
+
+def sga_momentum(grad, x, num_iters=200, step_size=0.1, mass=0.9, callback=None):
+    """Stochastic gradient ascent with momentum.
+    grad() must have signature grad(x, i), where i is the iteration number."""
+    velocity = np.zeros(len(x))
+    for i in range(num_iters):
+        g = grad(x)
+        if callback: callback(x, i, g)
+        velocity = mass * velocity - (1.0 - mass) * g
+        x = x + step_size * velocity
+    return x
 
 def adam(gradfun, params, num_iters, alpha=0.001, beta1=0.9, beta2=0.999, eps=1e-8, callback=None):
     # Maximizes a stochastic function using Adam.
