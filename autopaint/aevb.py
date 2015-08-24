@@ -1,8 +1,6 @@
-
 import autograd.numpy as np
 from autopaint.util import neg_kl_diag_normal
 from autopaint.neuralnet import make_gaussian_nn_funs, make_binarized_nn_funs
-
 
 
 def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,samples_per_image,latent_dimensions,rs):
@@ -12,8 +10,7 @@ def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,sample
     mean_kl = compute_kl(enc_w,train_images,encode)
     print "ll average", mean_log_prob.value
     print "kl average", mean_kl.value
-    return  \
-        mean_log_prob + mean_kl
+    return mean_log_prob + mean_kl
 
 def compute_log_prob(enc_w,dec_w,encode,decode_log_like,train_images,samples_per_image,latent_dimensions,rs):
     (mus,log_sigs) = encode(enc_w,train_images)
@@ -32,17 +29,14 @@ def compute_kl(enc_w,train_images,encode):
     return np.mean(kl_vect)
 
 def build_encoder(enc_layers):
-    L2_reg = 0
-    N_weights, predict_fun, log_likelihood = make_gaussian_nn_funs(enc_layers, L2_reg)
+    N_weights, predict_fun, log_likelihood = make_gaussian_nn_funs(enc_layers)
     return N_weights,predict_fun
 
 def build_gaussian_decoder(dec_layers):
-    L2_reg = 0
-    N_weights, predict_fun, log_likelihood = make_gaussian_nn_funs(dec_layers,L2_reg)
+    N_weights, predict_fun, log_likelihood = make_gaussian_nn_funs(dec_layers)
     return N_weights, predict_fun,log_likelihood
 
 def build_binarized_decoder(dec_layers):
-    L2_reg = 0
-    N_weights, predict_fun, log_likelihood = make_binarized_nn_funs(dec_layers,L2_reg)
+    N_weights, predict_fun, log_likelihood = make_binarized_nn_funs(dec_layers)
     return N_weights, predict_fun,log_likelihood
 

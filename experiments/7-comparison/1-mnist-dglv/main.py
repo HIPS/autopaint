@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     # Optimization parameters.
     batch_size = 100
-    num_training_iters = 100
+    num_training_iters = 10
     sampler_learn_rate = 0.01
     batch_idxs = make_batches(train_images.shape[0], batch_size)
 
@@ -75,10 +75,10 @@ if __name__ == '__main__':
         cur_data = train_images[batch_idxs[iter]]
         mus, log_sigs = encoder(encoder_weights, cur_data)
         samples, entropy_estimates = flow_sampler(flow_params, mus, np.exp(log_sigs), rs)
-        loglike = decoder_log_like(decoder_weights, samples, cur_data)
+        loglikes = decoder_log_like(decoder_weights, samples, cur_data)
 
-        print "Iter", iter, "loglik:", loglike.value, "entropy:", np.mean(entropy_estimates.value)
-        return np.mean(entropy_estimates) + loglike
+        print "Iter", iter, "loglik:", np.mean(loglikes).value, "entropy:", np.mean(entropy_estimates).value
+        return np.mean(entropy_estimates + loglikes)
 
     lb_grad = grad(get_batch_lower_bound)
 
@@ -93,7 +93,7 @@ if __name__ == '__main__':
         plot_images(samples, ax, ims_per_row=10)
         plt.savefig('samples.png')
 
-    final_params, final_value = adam(lb_grad, combined_params, num_training_iters, callback=callback)
+    final_params = adam(lb_grad, combined_params, num_training_iters, callback=callback)
 
     finish_time = time.time()
     print "Total training time:", finish_time - start_time

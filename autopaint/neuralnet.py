@@ -1,12 +1,9 @@
-import time
 import autograd.numpy as np
 import autograd.numpy.random as npr
 from autograd.scipy.misc import logsumexp
 from autograd import grad
 from autograd.util import quick_grad_check
 from autopaint.util import sigmoid,build_logprob_mvn
-
-
 
 # Network parameters   TODO: move these into experiment scripts.
 layer_sizes = [784, 200, 100, 10]
@@ -50,7 +47,7 @@ def make_nn_funs(layer_sizes, L2_reg):
     return N, predict_fun, loss, frac_err, likelihood
 
 
-def make_binarized_nn_funs(layer_sizes, L2_reg):
+def make_binarized_nn_funs(layer_sizes):
     #Like a neural net, but now our outputs are in [0,1]^D and the labels are {0,1}^D
     shapes = zip(layer_sizes[:-1], layer_sizes[1:])
     N = sum((m+1)*n for m, n in shapes)
@@ -70,14 +67,12 @@ def make_binarized_nn_funs(layer_sizes, L2_reg):
     def likelihood(W_vect, X, T):
         pred_probs = predict_fun(W_vect,X)
         label_probabilities =  np.log(pred_probs)* T + np.log((1 - pred_probs))* (1 - T)
-        #TODO: Mean or sum?
-        ll_vect = np.sum(label_probabilities,axis = 1)
-        return np.mean(ll_vect)
+        return np.sum(label_probabilities, axis=1)   # Sum across pixels.
 
     return N, predict_fun, likelihood
 
 
-def make_gaussian_nn_funs(layer_sizes, L2_reg):
+def make_gaussian_nn_funs(layer_sizes):
     #Like a neural net, but now our outputs are a mean and the log of a diagonal covariance matrix
     shapes = zip(layer_sizes[:-1], layer_sizes[1:])
     N = sum((m+1)*n for m, n in shapes)
@@ -97,17 +92,12 @@ def make_gaussian_nn_funs(layer_sizes, L2_reg):
         log_sig = outputs[:,D:2*D]
         return mu,log_sig
 
-    def likelihood(W_vect, X, T):
-        mu,log_sig = predict_fun(W_vect,X)
-        N = mu.shape[0]
-        #TODO: Vectorize
-        sum_logprobs = 0.0
-        for i in xrange(N):
-            curMu = mu[i,:]
-            curCov = np.diag(np.exp(log_sig[i,:])**2)
-            cur_log_prob = build_logprob_mvn(curMu,curCov,pseudo_inv=False)
-            sum_logprobs = sum_logprobs + cur_log_prob(T[i,:])
-        return sum_logprobs/N
+    def likelihood(weights, X, T):
+        means, log_sigs = predict_fun(weights, X)
+        D = means.shape[1]
+        T_minus_mean = (T - means) / log_sigs
+        const = -0.5 * D * np.log(2*np.pi) - np.sum(log_sigs, axis=1)
+        return const - 0.5 * np.einsum('ij,ij->i', T_minus_mean, T_minus_mean)
 
     return N, predict_fun, likelihood
 
