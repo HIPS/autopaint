@@ -6,11 +6,9 @@ import time
 import autograd.numpy as np
 from autograd import elementwise_grad
 
-
-from autopaint.util import WeightsParser, sigmoid,\
+from autopaint.util import WeightsParser, \
     entropy_of_a_diagonal_gaussian, entropy_of_a_spherical_gaussian, \
     sum_entropy_lower_bound, exact_log_det, approx_log_det
-
 
 
 def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):
@@ -27,10 +25,7 @@ def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):
         assert vect.shape == (N,D), vect.shape
         return vect + stepsize * hvp(xs, vect)
     if approx:
-        grad_step_start = time.time()
         delta_entropy = approx_log_det(jacobian_vector_product, D, N, rs=rs)
-        grad_step_end = time.time()
-        # print "log_det_time", grad_step_end-grad_step_start
     else:
         delta_entropy = exact_log_det(jacobian_vector_product, D, N)
     xs += stepsize * gradients
@@ -65,8 +60,6 @@ def build_langevin_sampler(loglik_func, D, num_steps, approx):
     parser.add_shape('log_stddev', D)
     parser.add_shape('log_stepsizes', num_steps)
     parser.add_shape('log_noise_sizes', num_steps)
-    parser.add_shape('log_gradient_scales', D)
-    parser.add_shape('invsig_gradient_power', 1)
 
     gradfun = elementwise_grad(loglik_func)
 
@@ -75,21 +68,11 @@ def build_langevin_sampler(loglik_func, D, num_steps, approx):
         stddevs         = np.exp(parser.get(params, 'log_stddev'))
         stepsizes       = np.exp(parser.get(params, 'log_stepsizes'))
         noise_sizes     = np.exp(parser.get(params, 'log_noise_sizes'))
-        gradient_scales = np.exp(parser.get(params, 'log_gradient_scales'))
-        gradient_power = sigmoid(parser.get(params, 'invsig_gradient_power'))
-
-        def scaled_gradfun(x):
-            # Todo:  Think about whether this should go inside gradfun,
-            # or in the step-size calculation. (and re-check bounds).
-            # Should we also scale the gradient before we apply the power?
-            gradient = gradfun(x)
-            gradient_magnitude = np.sqrt(np.sum(gradient**2, 1, keepdims=True))
-            return gradient_scales * gradient * gradient_magnitude**(gradient_power - 1.0)
 
         initial_entropies = np.full(num_samples, entropy_of_a_diagonal_gaussian(stddevs))
         init_xs = mean + rs.randn(num_samples, D) * stddevs
         samples, entropy_estimates = \
-            gradient_ascent_entropic(scaled_gradfun, entropies=initial_entropies, xs=init_xs,
+            gradient_ascent_entropic(gradfun, entropies=initial_entropies, xs=init_xs,
                                      stepsizes=stepsizes, noise_sizes=noise_sizes,
                                      rs=rs, callback=callback, approx=approx)
 
