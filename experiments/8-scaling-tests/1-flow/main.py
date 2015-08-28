@@ -79,6 +79,9 @@ def time_and_acc(latent_dimension):
 
         print "Iter", iter, "loglik:", np.mean(loglikes).value, \
             "entropy:", np.mean(entropy_estimates).value, "marg. like:", np.mean(entropy_estimates + loglikes).value
+        lastVal = np.mean(entropy_estimates + loglikes).value
+        with open('lastVal.pkl', 'w') as f:
+            pickle.dump(lastVal, f, 1)
         return np.mean(entropy_estimates + loglikes)
 
     lb_grad = grad(get_batch_lower_bound)
@@ -98,11 +101,14 @@ def time_and_acc(latent_dimension):
     final_params = adam(lb_grad, combined_params, num_training_iters, callback=callback)
 
     finish_time = time.time()
-    #Broken and very mysterious:
-    lb_val_grad = value_and_grad(get_batch_lower_bound)
-    lb_est = lb_val_grad(final_params,num_training_iters+2)
-    print lb_est
-    lb_est = lb_est[0]
+    # #Broken and very mysterious:
+    # lb_val_grad = value_and_grad(get_batch_lower_bound)
+    # lb_est = lb_val_grad(final_params,num_training_iters+2)
+    # print lb_est
+    # lb_est = lb_est[0]
+    with open('lastVal.pkl') as f:
+        lb_est = pickle.load(f)
+    print 'lb_est is', lb_est
     print "Total training time:", finish_time - start_time
     return finish_time, lb_est
 
