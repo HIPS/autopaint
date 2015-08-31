@@ -4,7 +4,7 @@ from autopaint.util import neg_kl_diag_normal
 def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,samples_per_image,latent_dimensions,rs):
     enc_w = weights[0:N_weights_enc]
     dec_w = weights[N_weights_enc:len(weights)]
-    mean_log_prob = compute_log_prob(enc_w,dec_w,encode,decode_log_like,train_images,samples_per_image,latent_dimensions,rs)
+    mean_log_prob = np.mean(compute_log_prob(enc_w,dec_w,encode,decode_log_like,train_images,samples_per_image,latent_dimensions,rs))
     mean_kl = compute_kl(enc_w,train_images,encode)
     print "ll average", mean_log_prob.value
     print "kl average", mean_kl.value
