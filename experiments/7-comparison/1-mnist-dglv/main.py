@@ -35,7 +35,7 @@ if __name__ == '__main__':
     start_time = time.time()
     rs = np.random.npr.RandomState(0)
     #load_and_pickle_binary_mnist()
-    with open('mnist_binary_data.pkl') as f:
+    with open('../../../autopaint/mnist_binary_data.pkl') as f:
         N_data, train_images, train_labels, test_images, test_labels = pickle.load(f)
 
     D = train_images.shape[1]
@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     # Optimization parameters.
     batch_size = 100
-    num_training_iters = 10
+    num_training_iters = 100
     sampler_learn_rate = 0.01
     batch_idxs = make_batches(train_images.shape[0], batch_size)
 

@@ -8,12 +8,12 @@ import autograd.numpy as np
 from autograd import value_and_grad
 
 from autopaint.plotting import plot_images
-from autopaint.optimizers import adam_mini_batch,ada_grad_mini_batch,ada_delta_mini_batch
+from autopaint.optimizers import adam
 from autopaint.neuralnet import make_batches
 from autopaint.util import load_mnist
-from autopaint.aevb import build_encoder, build_binarized_decoder, lower_bound
+from autopaint.aevb import lower_bound
 from autopaint.util import WeightsParser, load_and_pickle_binary_mnist
-
+from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
 param_scale = 0.1
 samples_per_image = 1
 latent_dimensions = 2
@@ -30,12 +30,12 @@ def run_aevb(train_images):
     enc_layers = [D, hidden_units, 2*latent_dimensions]
     dec_layers = [latent_dimensions, hidden_units, D]
 
-    N_weights_enc, encoder = build_encoder(enc_layers)
-    N_weights_dec, decoder, decoder_log_like = build_binarized_decoder(dec_layers)
+    N_weights_enc, encoder, encoder_log_like = make_gaussian_nn(enc_layers)
+    N_weights_dec, decoder, decoder_log_like = make_binary_nn(dec_layers)
 
     # Optimize aevb
     batch_size = 100
-    num_epochs = 160
+    num_opt_iters = 160
     rs = npr.RandomState(0)
 
     parser = WeightsParser()
@@ -45,9 +45,10 @@ def run_aevb(train_images):
 
     batch_idxs = make_batches(train_images.shape[0], batch_size)
 
-    def batch_value_and_grad(weights, idxs):
+    def batch_value_and_grad(weights, iter):
+        cur_data = train_images[batch_idxs[iter]]
         def batch_lower_bound(weights):
-            return lower_bound(weights,encoder,decoder_log_like,N_weights_enc,train_images[idxs],samples_per_image,latent_dimensions,rs)
+            return lower_bound(weights,encoder,decoder_log_like,N_weights_enc,cur_data,samples_per_image,latent_dimensions,rs)
 
         val_and_grad_func = value_and_grad(batch_lower_bound)
 
@@ -67,8 +68,8 @@ def run_aevb(train_images):
         plot_images(samples, ax, ims_per_row=images_per_row)
         plt.savefig('samples.png')
 
-    final_params, final_value = adam_mini_batch(batch_value_and_grad, initial_combined_weights,
-                                                batch_idxs, num_epochs, callback=callback)
+    final_params, final_value = adam(batch_value_and_grad, initial_combined_weights,
+                                                num_opt_iters, callback=callback)
 
     def decoder_with_weights(zs):
         return decoder(parser.get(final_params, 'decoding weights'), zs)
