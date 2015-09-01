@@ -248,6 +248,16 @@ def neg_kl_diag_normal(mu,sig):
     kl_vect = .5*kl_vect
     return kl_vect
 
+def neg_kl_diag_scaled_normal(mu,sig,alpha):
+    #Computes of the -1 * kl divergence of a diagonal gaussians vs a alpha*normal gaussian
+    #Takes in an nxd vectors of means and diagonal covariances
+    D = mu.shape[1]
+    combined_mat = np.log(sig**2)-(mu**2+sig**2)/alpha**2
+    kl_vect = np.sum(combined_mat,axis = 1)
+    kl_vect = kl_vect + D*np.ones(mu.shape[0])-D*np.log(alpha**2)*np.ones(mu.shape[0])
+    kl_vect = .5*kl_vect
+    return kl_vect
+
 def binarized_loglike(pred_probs,T):
     label_probabilities =  pred_probs* T + (1 - pred_probs) * (1 - T)
     #TODO: Mean or sum?
