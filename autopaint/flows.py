@@ -20,9 +20,9 @@ def composed_flow(entropies, zs, output_weights, transform_weights, biases, call
     num_steps = len(biases)
 
     for t in xrange(num_steps):
-        if callback: callback(zs=zs, t=t, entropy=delta_entropy)
         zs, delta_entropy = flow_step(zs, output_weights[t], transform_weights[t], biases[t])
         entropies += delta_entropy
+        if callback: callback(zs=zs, t=t, entropy=delta_entropy)
 
     return zs, entropies
 
