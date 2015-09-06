@@ -11,8 +11,8 @@ from autograd import grad
 import matplotlib.pyplot as plt
 
 from autopaint.plotting import *
-from autopaint.inference import build_langevin_sampler
-from autopaint.util import logprob_mvn
+from autopaint.langevin import build_langevin_sampler
+from autopaint.util import build_logprob_mvn
 
 def plot_sampler_params(params, filename):
 
@@ -50,7 +50,7 @@ if __name__ == '__main__':
 
     t0 = time.time()
 
-    num_samples = 2000
+    num_samples = 200
     num_langevin_steps = 3
     num_sampler_optimization_steps = 200
     sampler_learn_rate = 0.2
@@ -62,7 +62,7 @@ if __name__ == '__main__':
     init_log_noise_sizes = np.log(0.1*np.ones(num_langevin_steps))
 
     rs = np.random.npr.RandomState(0)
-
+    logprob_mvn = build_logprob_mvn(np.zeros(2),np.array([[1,.9],[.9,1]]))
     sample_and_run_langevin, parser = build_langevin_sampler(logprob_mvn, D, num_langevin_steps, approx=False)
 
     sampler_params = np.zeros(len(parser))
