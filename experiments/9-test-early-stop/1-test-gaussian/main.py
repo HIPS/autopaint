@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     t0 = time.time()
 
-    num_samples = 1
+    num_samples = 100
     num_sampler_optimization_steps = 200
     sampler_learn_rate = .2
 
@@ -67,7 +67,14 @@ if __name__ == '__main__':
 
 
     def get_batch_marginal_likelihood_estimate(sampler_params):
-        samples, loglik_estimates, entropy_estimates =   sample_and_run_early_stop(sampler_params,rs,1)
+        samples = np.zeros((num_samples,D))
+        loglik_estimates = np.array(num_samples)
+        entropy_estimates = np.array(num_samples)
+        for i in xrange(num_samples):
+            sample, loglik_estimate, entropy_estimate =   sample_and_run_early_stop(sampler_params,rs,1)
+            samples[i,:] = sample
+            loglik_estimates[i] = loglik_estimate
+            entropy_estimates[i] = entropy_estimate
         marginal_likelihood_estimates = loglik_estimates + entropy_estimates
         print "mean loglik:", np.mean(loglik_estimates), " mean entropy:", np.mean(entropy_estimates)
         plot_density(samples.value, "approximating_dist.png")

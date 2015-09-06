@@ -43,8 +43,8 @@ def gradient_ascent_entropic(gradfun, loglik,entropies, xs, step_size, rs, callb
         prevL = curL
         new_loglik = loglik(new_xs)
         curL = new_loglik+new_entropies
-        print 'new log lik: ', (new_loglik), 'new ent :' , new_entropies
-        print 'new L: ', curL
+        # print 'new log lik: ', (new_loglik), 'new ent :' , new_entropies
+        # print 'new L: ', curL
         if curL > prevL:
             xs = new_xs
             entropies = new_entropies
