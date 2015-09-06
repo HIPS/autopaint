@@ -18,8 +18,8 @@ def plot_sampler_params(params, filename):
 
     mean = parser.get(params, 'mean')
     stddev = np.exp(parser.get(params, 'log_stddev'))
-    stepsizes = np.exp(parser.get(params, 'log_stepsizes'))
-    noise_sizes = np.exp(parser.get(params, 'log_noise_sizes'))
+    stepsizes = np.exp(parser.get(params, 'log_stepsize'))
+
 
     # ----- Nice versions of Alpha and beta schedules for paper -----
     fig = plt.figure(0)
@@ -37,10 +37,6 @@ def plot_sampler_params(params, filename):
     ax.set_ylabel('stepsizes', fontproperties='serif')
     ax.set_xlabel('Langevin iterations', fontproperties='serif')
 
-    ax = fig.add_subplot(414)
-    ax.plot(noise_sizes, 'o-')
-    ax.set_ylabel('noise_sizes', fontproperties='serif')
-    ax.set_xlabel('Langevin iterations', fontproperties='serif')
 
     fig.subplots_adjust(hspace=.5)
     plt.savefig(filename)
@@ -51,11 +47,13 @@ if __name__ == '__main__':
     t0 = time.time()
 
     num_samples = 1
+    num_sampler_optimization_steps = 200
+    sampler_learn_rate = .2
 
     D = 2
     init_mean = np.zeros(D)
     init_log_stddevs = np.log(1.0*np.ones(D))
-    init_log_stepsize = np.log(0.0001)
+    init_log_stepsize = np.log(0.01)
 
     rs = np.random.npr.RandomState(0)
     logprob_mvn = build_logprob_mvn(np.zeros(2),np.array([[1,0],[0,1]]))
@@ -66,24 +64,23 @@ if __name__ == '__main__':
     parser.put(sampler_params, 'log_stddev', init_log_stddevs)
     parser.put(sampler_params, 'log_stepsize', init_log_stepsize)
 
-    sample_and_run_early_stop(sampler_params,rs,1)
 
 
-    # def get_batch_marginal_likelihood_estimate(sampler_params):
-    #     samples, loglik_estimates, entropy_estimates = sample_and_run_langevin(sampler_params, rs, num_samples)
-    #     marginal_likelihood_estimates = loglik_estimates + entropy_estimates
-    #     print "mean loglik:", np.mean(loglik_estimates), " mean entropy:", np.mean(entropy_estimates)
-    #     plot_density(samples.value, "approximating_dist.png")
-    #     return np.mean(marginal_likelihood_estimates)
-    #
-    # ml_and_grad = value_and_grad(get_batch_marginal_likelihood_estimate)
-    #
-    # # Optimize Langevin parameters.
-    # for i in xrange(num_sampler_optimization_steps):
-    #     ml, dml = ml_and_grad(sampler_params)
-    #     print "log marginal likelihood:", ml
-    #     plot_sampler_params(sampler_params, 'sampler_params.png')
-    #     sampler_params = sampler_params + sampler_learn_rate * dml
+    def get_batch_marginal_likelihood_estimate(sampler_params):
+        samples, loglik_estimates, entropy_estimates =   sample_and_run_early_stop(sampler_params,rs,1)
+        marginal_likelihood_estimates = loglik_estimates + entropy_estimates
+        print "mean loglik:", np.mean(loglik_estimates), " mean entropy:", np.mean(entropy_estimates)
+        plot_density(samples.value, "approximating_dist.png")
+        return np.mean(marginal_likelihood_estimates)
+
+    ml_and_grad = value_and_grad(get_batch_marginal_likelihood_estimate)
+
+    # Optimize Langevin parameters.
+    for i in xrange(num_sampler_optimization_steps):
+        ml, dml = ml_and_grad(sampler_params)
+        print "log marginal likelihood:", ml
+        plot_sampler_params(sampler_params, 'sampler_params.png')
+        sampler_params = sampler_params + sampler_learn_rate * dml
 
     t1 = time.time()
     print "total runtime", t1-t0
