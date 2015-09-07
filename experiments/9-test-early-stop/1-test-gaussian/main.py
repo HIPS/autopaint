@@ -53,27 +53,20 @@ if __name__ == '__main__':
     D = 2
     init_mean = np.zeros(D)
     init_log_stddevs = np.log(1.0*np.ones(D))
-    init_log_stepsize = np.log(0.001)
+    init_log_stepsize = np.log(0.01)
 
     rs = np.random.npr.RandomState(0)
     logprob_mvn = build_logprob_mvn(np.zeros(2),np.array([[1,.9],[.9,1]]))
-    sample_and_run_early_stop, parser = build_early_stop(logprob_mvn, D, approx=False)
+    sample_and_run_early_stop, parser = build_early_stop(D, approx=False)
 
     sampler_params = np.zeros(len(parser))
     parser.put(sampler_params, 'mean', init_mean)
     parser.put(sampler_params, 'log_stddev', init_log_stddevs)
     parser.put(sampler_params, 'log_stepsize', init_log_stepsize)
 
-
-
     def get_batch_marginal_likelihood_estimate(sampler_params):
-        # loglik_estimates = np.array(num_samples)
-        # entropy_estimates = np.array(num_samples)
-        # samples = []
-        # loglik_estimates = []
-        # entropy_estimates = []
         for i in xrange(num_samples):
-            sample, loglik_estimate, entropy_estimate =   sample_and_run_early_stop(sampler_params,rs,1)
+            sample, loglik_estimate, entropy_estimate =   sample_and_run_early_stop(sampler_params,logprob_mvn,rs,1)
             if i == 0:
                 samples = sample
                 loglik_estimates = loglik_estimate

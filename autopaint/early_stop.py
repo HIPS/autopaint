@@ -50,7 +50,7 @@ def gradient_ascent_entropic(gradfun, loglik,entropies, xs, step_size, rs, callb
         curIter += 1
     return xs, entropies
 
-def build_early_stop(loglik_func, D, approx):
+def build_early_stop( D, approx):
 
     # Build parser
     parser = WeightsParser()
@@ -58,9 +58,10 @@ def build_early_stop(loglik_func, D, approx):
     parser.add_shape('log_stddev', D)
     parser.add_shape('log_stepsize', 1)
 
-    gradfun = elementwise_grad(loglik_func)
 
-    def sample_and_run_early_stop(params, rs, num_samples, callback=None):
+
+    def sample_and_run_early_stop(params, loglik_func, rs, num_samples, callback=None):
+        gradfun = elementwise_grad(loglik_func)
         mean                   = parser.get(params, 'mean')
         stddevs         = np.exp(parser.get(params, 'log_stddev'))
         stepsize       = np.exp(parser.get(params, 'log_stepsize'))
