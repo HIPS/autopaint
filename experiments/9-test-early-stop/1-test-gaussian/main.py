@@ -53,10 +53,10 @@ if __name__ == '__main__':
     D = 2
     init_mean = np.zeros(D)
     init_log_stddevs = np.log(1.0*np.ones(D))
-    init_log_stepsize = np.log(0.01)
+    init_log_stepsize = np.log(0.001)
 
     rs = np.random.npr.RandomState(0)
-    logprob_mvn = build_logprob_mvn(np.zeros(2),np.array([[1,0],[0,1]]))
+    logprob_mvn = build_logprob_mvn(np.zeros(2),np.array([[1,.9],[.9,1]]))
     sample_and_run_early_stop, parser = build_early_stop(logprob_mvn, D, approx=False)
 
     sampler_params = np.zeros(len(parser))
@@ -67,14 +67,21 @@ if __name__ == '__main__':
 
 
     def get_batch_marginal_likelihood_estimate(sampler_params):
-        samples = np.zeros((num_samples,D))
-        loglik_estimates = np.array(num_samples)
-        entropy_estimates = np.array(num_samples)
+        # loglik_estimates = np.array(num_samples)
+        # entropy_estimates = np.array(num_samples)
+        # samples = []
+        # loglik_estimates = []
+        # entropy_estimates = []
         for i in xrange(num_samples):
             sample, loglik_estimate, entropy_estimate =   sample_and_run_early_stop(sampler_params,rs,1)
-            samples[i,:] = sample
-            loglik_estimates[i] = loglik_estimate
-            entropy_estimates[i] = entropy_estimate
+            if i == 0:
+                samples = sample
+                loglik_estimates = loglik_estimate
+                entropy_estimates = entropy_estimate
+            else:
+                samples = np.concatenate((samples,sample),axis = 0)
+                loglik_estimates = np.concatenate((loglik_estimates, loglik_estimate),axis = 0)
+                entropy_estimates = np.concatenate((entropy_estimates, entropy_estimate),axis = 0)
         marginal_likelihood_estimates = loglik_estimates + entropy_estimates
         print "mean loglik:", np.mean(loglik_estimates), " mean entropy:", np.mean(entropy_estimates)
         plot_density(samples.value, "approximating_dist.png")

@@ -35,19 +35,19 @@ def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):
 def gradient_ascent_entropic(gradfun, loglik,entropies, xs, step_size, rs, callback, approx):
     prevL = -np.inf
     curL = loglik(xs)+entropies
+    curIter = 0
     while curL > prevL:
         if callback: callback(xs=xs, t=t, entropy=delta_entropy)
-        new_xs, delta_entropy = gradient_step_track_entropy(gradfun, xs, step_size, rs, approx=approx)
+        new_xs, delta_entropy = gradient_step_track_entropy(gradfun, xs,step_size, rs, approx=approx)
         # Update entropy estimate.
         new_entropies = delta_entropy+entropies
         prevL = curL
         new_loglik = loglik(new_xs)
         curL = new_loglik+new_entropies
-        # print 'new log lik: ', (new_loglik), 'new ent :' , new_entropies
-        # print 'new L: ', curL
         if curL > prevL:
             xs = new_xs
             entropies = new_entropies
+        curIter += 1
     return xs, entropies
 
 def build_early_stop(loglik_func, D, approx):
