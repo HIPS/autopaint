@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import autograd.numpy.random as npr
 import autograd.numpy as np
 
-from autograd import value_and_grad
+from autograd import grad
 
 from autopaint.plotting import plot_images
 from autopaint.optimizers import adam
@@ -35,7 +35,7 @@ def run_aevb(train_images):
 
     # Optimize aevb
     batch_size = 100
-    num_opt_iters = 160
+    num_training_iters = 160
     rs = npr.RandomState(0)
 
     parser = WeightsParser()
@@ -47,29 +47,25 @@ def run_aevb(train_images):
 
     def batch_value_and_grad(weights, iter):
         cur_data = train_images[batch_idxs[iter]]
-        def batch_lower_bound(weights):
-            return lower_bound(weights,encoder,decoder_log_like,N_weights_enc,cur_data,samples_per_image,latent_dimensions,rs)
+        return lower_bound(weights,encoder,decoder_log_like,N_weights_enc,cur_data,samples_per_image,latent_dimensions,rs)
+    lb_grad = grad(batch_value_and_grad)
 
-        val_and_grad_func = value_and_grad(batch_lower_bound)
-
-        return val_and_grad_func(weights)
-
-    def callback(ml, weights, grad):
+    def callback(params, i, grad):
+        ml = batch_value_and_grad(params,i)
         print "log marginal likelihood:", ml
 
         #Generate samples
         num_samples = 100
         images_per_row = 10
         zs = rs.randn(num_samples,latent_dimensions)
-        samples = decoder(parser.get(weights, 'decoding weights'), zs)
+        samples = decoder(parser.get(params, 'decoding weights'), zs)
         fig = plt.figure(1)
         fig.clf()
         ax = fig.add_subplot(111)
         plot_images(samples, ax, ims_per_row=images_per_row)
         plt.savefig('samples.png')
 
-    final_params, final_value = adam(batch_value_and_grad, initial_combined_weights,
-                                                num_opt_iters, callback=callback)
+    final_params = adam(lb_grad, initial_combined_weights, num_training_iters, callback=callback)
 
     def decoder_with_weights(zs):
         return decoder(parser.get(final_params, 'decoding weights'), zs)
