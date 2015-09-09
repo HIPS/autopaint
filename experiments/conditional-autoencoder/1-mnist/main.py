@@ -1,13 +1,11 @@
 import pickle
 import time
+import matplotlib
 import matplotlib.pyplot as plt
-
 import autograd.numpy.random as npr
 import autograd.numpy as np
-
 from autograd import grad,value_and_grad
 from autograd.util import quick_grad_check
-import matplotlib
 from scipy.optimize import minimize
 
 from autopaint.plotting import plot_images
@@ -17,6 +15,7 @@ from autopaint.util import load_mnist
 from autopaint.aevb import lower_bound
 from autopaint.util import WeightsParser, load_and_pickle_binary_mnist
 from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
+
 param_scale = 0.1
 samples_per_image = 1
 latent_dimensions = 10
@@ -33,8 +32,6 @@ def create_prob_of_data(parameters,encoder,decoder_log_like):
 def run_aevb(train_images):
     start_time = time.time()
 
-
-    # Optimize aevb
     batch_size = 100
     num_training_iters = 320
     rs = npr.RandomState(0)
@@ -69,8 +66,6 @@ def run_aevb(train_images):
 
     final_params = adam(lb_grad, initial_combined_weights, num_training_iters, callback=callback)
 
-
-
     parameters = final_params,N_weights_enc,samples_per_image,latent_dimensions,rs
     with open('parameters.pkl', 'w') as f:
         pickle.dump(parameters, f, 1)
@@ -83,14 +78,9 @@ if __name__ == '__main__':
     with open('../../../autopaint/mnist_binary_data.pkl') as f:
         N_data, train_images, train_labels, test_images, test_labels = pickle.load(f)
 
-   # Create aevb function
-    # Training parameters
-
     D = train_images.shape[1]
-
     enc_layers = [D, hidden_units, 2*latent_dimensions]
     dec_layers = [latent_dimensions, hidden_units, D]
-
     N_weights_enc, encoder, encoder_log_like = make_gaussian_nn(enc_layers)
     N_weights_dec, decoder, decoder_log_like = make_binary_nn(dec_layers)
 
@@ -112,7 +102,7 @@ if __name__ == '__main__':
     model_ll = lambda image, c: data_L(image) +classifier_loglik(image, c)
 
     def model_nll(image,c):
-        return -1*model_ll(image,c)
+        return -model_ll(image,c)
 
     model_nll_with_grad = value_and_grad(model_nll)
 
