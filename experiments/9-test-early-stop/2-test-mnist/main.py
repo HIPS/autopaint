@@ -27,11 +27,19 @@ def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,sample
     enc_w = weights[0:N_weights_enc]
     dec_w = weights[N_weights_enc:len(weights)]
     #Choose an image from train_images
-    idx = np.random.randint(0,train_images.shape[0]-1)
-    x = train_images[idx,:]
-    def log_lik_func(z):
-        return decode_log_like(dec_w,z,x)
-    sample, loglik_estimate, entropy_estimate = encode(enc_w,log_lik_func,rs,1)
+    for idx in xrange(train_images.shape[0]):
+        x = train_images[idx,:]
+        def log_lik_func(z):
+            return decode_log_like(dec_w,z,x)
+        sample, loglik_estimate, entropy_estimate = encode(enc_w,log_lik_func,rs,1)
+        if idx == 0:
+            samples = sample
+            loglik_estimates = loglik_estimate
+            entropy_estimates = entropy_estimate
+        else:
+            samples = np.concatenate((samples,sample),axis = 0)
+            loglik_estimates = np.concatenate((loglik_estimates, loglik_estimate),axis = 0)
+            entropy_estimates = np.concatenate((entropy_estimates, entropy_estimate),axis = 0)
     print "ll average", loglik_estimate
     print "kl average", entropy_estimate
     return loglik_estimate + entropy_estimate
