@@ -11,12 +11,12 @@ from autopaint.plotting import plot_images
 from autopaint.optimizers import adam
 from autopaint.neuralnet import make_batches
 from autopaint.util import load_mnist
-from autopaint.aevb import lower_bound
-from autopaint.util import WeightsParser, load_and_pickle_binary_mnist
+from autopaint.aevb_ent import lower_bound
+from autopaint.util import WeightsParser, load_and_pickle_binary_mnist,build_logprob_standard_normal
 from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
 param_scale = 0.1
-samples_per_image = 10
-latent_dimensions = 20
+samples_per_image = 1
+latent_dimensions = 2
 hidden_units = 500
 
 def run_aevb(train_images):
@@ -44,21 +44,23 @@ def run_aevb(train_images):
     initial_combined_weights = rs.randn(len(parser)) * param_scale
 
     batch_idxs = make_batches(train_images.shape[0], batch_size)
-
+    log_prior = build_logprob_standard_normal(latent_dimensions)
     def batch_value_and_grad(weights, iter):
+        iter = iter % len(batch_idxs)
         cur_data = train_images[batch_idxs[iter]]
-        return lower_bound(weights,encoder,decoder_log_like,N_weights_enc,cur_data,samples_per_image,latent_dimensions,rs)
+        return lower_bound(weights,encoder,decoder_log_like,log_prior,N_weights_enc,cur_data,samples_per_image,latent_dimensions,rs)
     lb_grad = grad(batch_value_and_grad)
 
     def callback(params, i, grad):
         ml = batch_value_and_grad(params,i)
         print "log marginal likelihood:", ml
-
         #Generate samples
         num_samples = 100
         images_per_row = 10
         zs = rs.randn(num_samples,latent_dimensions)
         samples = decoder(parser.get(params, 'decoding weights'), zs)
+        # samples = np.random.binomial(1,decoder(parser.get(params, 'decoding weights'), zs))
+
         fig = plt.figure(1)
         fig.clf()
         ax = fig.add_subplot(111)
@@ -83,3 +85,4 @@ if __name__ == '__main__':
         N_data, train_images, train_labels, test_images, test_labels = pickle.load(f)
 
     decoder = run_aevb(train_images)
+

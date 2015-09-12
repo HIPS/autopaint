@@ -170,7 +170,6 @@ def entropy_of_a_diagonal_gaussian(stddevs):
     D = len(stddevs)
     return 0.5 * D * (1.0 + np.log(2*np.pi)) + np.sum(np.log(stddevs))
 
-
 def entropy_of_diagonal_gaussians(stddevs_mat):
     #Returns entropy of several different diagonal gaussians
     if len(stddevs_mat.shape) == 1:
@@ -249,7 +248,7 @@ def neg_kl_diag_normal(mu,sig):
     return kl_vect
 
 def neg_kl_diag_scaled_normal(mu,sig,alpha):
-    #Computes of the -1 * kl divergence of a diagonal gaussians vs a alpha*normal gaussian
+    #Computes of the -1 * kl divergence of a diagonal gaussians vs an alpha*normal gaussian
     #Takes in an nxd vectors of means and diagonal covariances
     D = mu.shape[1]
     combined_mat = np.log(sig**2)-(mu**2+sig**2)/alpha**2
