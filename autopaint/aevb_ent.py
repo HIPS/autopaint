@@ -24,3 +24,9 @@ def compute_log_prob_and_ent(enc_w,dec_w,encode,decode_log_like,log_prior,train_
 
 
 
+def enc_lower_bound(enc_w,dec_w,encode,decode_log_like,log_prior,N_weights_enc,train_images,samples_per_image,latent_dimensions,rs):
+    #Like lowerbound, but we're assuming dec_w is given to us and will not be optimized
+    mean_log_joint,mean_ent = compute_log_prob_and_ent(enc_w,dec_w,encode,decode_log_like,log_prior,train_images,samples_per_image,latent_dimensions,rs)
+    print "joint ll average",mean_log_joint
+    print "ent average", mean_ent
+    return mean_log_joint + mean_ent
