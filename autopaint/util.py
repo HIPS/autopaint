@@ -268,3 +268,15 @@ def load_and_pickle_binary_mnist():
     mnist_data = N_data, train_images, train_labels, test_images, test_labels
     with open('mnist_binary_data.pkl', 'w') as f:
         pickle.dump(mnist_data, f, 1)
+
+def create_banded_cov(d,b):
+    #Create a banded dxd covariance matrix with bandwidth b
+    cov = np.zeros((d,d))
+    for i in xrange(d):
+        for j in xrange(d):
+            if abs(i-j) < b:
+                cov[i,j] = 1.0/(abs(i-j)+1)**2
+    #Double check that it's PSD
+    np.linalg.cholesky(cov)
+    return cov
+
