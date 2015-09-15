@@ -150,8 +150,6 @@ def sample_from_normal_bimodal(mean1,mean2,num_samples,rs):
     return samples
 
 
-
-
 def build_unwhitener(mean, cov):
     """Builds a function that takes in a draw from a standard normal, and
        turns it into a draw from a MVN with mean, cov."""

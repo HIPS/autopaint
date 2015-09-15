@@ -15,8 +15,8 @@ from autopaint.aevb import lower_bound
 from autopaint.util import WeightsParser, load_and_pickle_binary_mnist
 from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
 param_scale = 0.1
-samples_per_image = 10
-latent_dimensions = 20
+samples_per_image = 1
+latent_dimensions = 10
 hidden_units = 500
 
 def run_aevb(train_images):
@@ -46,6 +46,7 @@ def run_aevb(train_images):
     batch_idxs = make_batches(train_images.shape[0], batch_size)
 
     def batch_value_and_grad(weights, iter):
+        iter = iter % len(batch_idxs)
         cur_data = train_images[batch_idxs[iter]]
         return lower_bound(weights,encoder,decoder_log_like,N_weights_enc,cur_data,samples_per_image,latent_dimensions,rs)
     lb_grad = grad(batch_value_and_grad)

@@ -16,7 +16,7 @@ from autopaint.util import WeightsParser, load_and_pickle_binary_mnist,build_log
 from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
 param_scale = 0.1
 samples_per_image = 1
-latent_dimensions = 2
+latent_dimensions = 10
 hidden_units = 500
 
 def run_aevb(train_images):
