@@ -27,7 +27,7 @@ def run_variational_network(train_images,N_weights_dec,decoder,decoder_log_like,
 
     D = train_images.shape[1]
 
-    enc_layers = [D, hidden_units, 2*latent_dimensions]
+    enc_layers = [D, hidden_units,hidden_units, 2*latent_dimensions]
 
     N_weights_enc, encoder, encoder_log_like = make_gaussian_nn(enc_layers)
 
@@ -41,7 +41,7 @@ def run_variational_network(train_images,N_weights_dec,decoder,decoder_log_like,
     initial_enc_w = rs.randn(len(parser)) * param_scale
 
     batch_idxs = make_batches(train_images.shape[0], batch_size)
-    banded_cov = create_banded_cov(all_cov.shape[0],100)
+    banded_cov = create_banded_cov(all_cov.shape[0],10)
     log_prior = build_logprob_mvn(all_mean, banded_cov)
     def batch_value_and_grad(enc_w, iter):
         iter = iter % len(batch_idxs)
@@ -55,8 +55,17 @@ def run_variational_network(train_images,N_weights_dec,decoder,decoder_log_like,
         #Generate samples
         num_samples = 100
         images_per_row = 10
-        zs = train_images[0:100,:]
-        samples = encoder(params, zs)[0]
+        # zs = train_images[0:100,:]
+        zs = np.zeros((100,10))
+        zs[:,1] = .5
+        zs[:,5] = .5
+        (mus,log_sigs) = encoder(params, zs)
+        # sigs = np.exp(log_sigs)
+        # noise = rs.randn(1,100,784)
+        # samples = mus + sigs*noise
+        # samples = np.reshape(samples,(100*1,784),order = 'F')
+        samples = mus
+
         fig = plt.figure(1)
         fig.clf()
         ax = fig.add_subplot(111)
