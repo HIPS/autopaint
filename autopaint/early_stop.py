@@ -37,6 +37,8 @@ def gradient_ascent_entropic(gradfun, loglik,entropies, xs, step_size, rs, callb
     curL = loglik(xs)+entropies
     curIter = 0
     while curL > prevL:
+        if curIter % 10 == 0:
+            print 'grad step',curIter
         if callback: callback(xs=xs, t=t, entropy=delta_entropy)
         new_xs, delta_entropy = gradient_step_track_entropy(gradfun, xs,step_size, rs, approx=approx)
         # Update entropy estimate.

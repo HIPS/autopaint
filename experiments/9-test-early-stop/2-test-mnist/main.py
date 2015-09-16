@@ -12,7 +12,7 @@ from autopaint.optimizers import adam
 from autopaint.neuralnet import make_batches
 from autopaint.util import load_mnist
 from autopaint.aevb import lower_bound
-from autopaint.util import WeightsParser, load_and_pickle_binary_mnist
+from autopaint.util import WeightsParser, load_and_pickle_binary_mnist,build_logprob_mvn
 from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
 from autopaint.early_stop import build_early_stop
 param_scale = 0.1
@@ -26,11 +26,12 @@ from autopaint.util import neg_kl_diag_normal
 def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,samples_per_image,latent_dimensions,rs):
     enc_w = weights[0:N_weights_enc]
     dec_w = weights[N_weights_enc:len(weights)]
+    log_normal = build_logprob_mvn(np.zeros(latent_dimensions), np.eye(latent_dimensions),pseudo_inv = True)
     #Choose an image from train_images
     for idx in xrange(train_images.shape[0]):
         x = train_images[idx,:]
         def log_lik_func(z):
-            return decode_log_like(dec_w,z,x)
+            return decode_log_like(dec_w,z,x)+log_normal(z)
         sample, loglik_estimate, entropy_estimate = encode(enc_w,log_lik_func,rs,1)
         if idx == 0:
             samples = sample
@@ -74,7 +75,7 @@ def run_aevb(train_images):
     parser.put(params, 'decoding weights',rs.randn(N_weights_dec) * param_scale)
 
     # Optimize aevb
-    batch_size = 100
+    batch_size = 2
     num_training_iters = 1600
     rs = npr.RandomState(0)
 
@@ -94,6 +95,7 @@ def run_aevb(train_images):
         num_samples = 100
         images_per_row = 10
         zs = rs.randn(num_samples,latent_dimensions)
+        # samples = np.random.binomial(1,decoder(parser.get(params, 'decoding weights'), zs))
         samples = decoder(parser.get(params, 'decoding weights'), zs)
         fig = plt.figure(1)
         fig.clf()

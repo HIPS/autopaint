@@ -1,13 +1,13 @@
 import autograd.numpy as np
-from autopaint.util import neg_kl_diag_normal
-
+from autopaint.util import neg_kl_diag_normal, entropy_of_diagonal_gaussians,build_logprob_standard_normal, entropy_of_a_diagonal_gaussian
+from scipy.stats import entropy
 def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,samples_per_image,latent_dimensions,rs):
     enc_w = weights[0:N_weights_enc]
     dec_w = weights[N_weights_enc:len(weights)]
     mean_log_prob = np.mean(compute_log_prob(enc_w,dec_w,encode,decode_log_like,train_images,samples_per_image,latent_dimensions,rs))
     mean_kl = compute_kl(enc_w,train_images,encode)
     print "ll average", mean_log_prob
-    print "kl average", mean_kl
+    print "neg kl average", mean_kl
     return mean_log_prob + mean_kl
 
 def compute_log_prob(enc_w,dec_w,encode,decode_log_like,train_images,samples_per_image,latent_dimensions,rs):
@@ -25,5 +25,10 @@ def compute_kl(enc_w,train_images,encode):
     sigs = np.exp(log_sigs)
     kl_vect = neg_kl_diag_normal(mus,sigs)
     return np.mean(kl_vect)
+
+def cross_ent(mus,sigs):
+    return -1*.5*(np.log(2*np.pi)+sigs**2+mus**2)
+
+
 
 

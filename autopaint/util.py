@@ -150,8 +150,6 @@ def sample_from_normal_bimodal(mean1,mean2,num_samples,rs):
     return samples
 
 
-
-
 def build_unwhitener(mean, cov):
     """Builds a function that takes in a draw from a standard normal, and
        turns it into a draw from a MVN with mean, cov."""
@@ -169,7 +167,6 @@ def entropy_of_a_gaussian(cov):
 def entropy_of_a_diagonal_gaussian(stddevs):
     D = len(stddevs)
     return 0.5 * D * (1.0 + np.log(2*np.pi)) + np.sum(np.log(stddevs))
-
 
 def entropy_of_diagonal_gaussians(stddevs_mat):
     #Returns entropy of several different diagonal gaussians
@@ -249,7 +246,7 @@ def neg_kl_diag_normal(mu,sig):
     return kl_vect
 
 def neg_kl_diag_scaled_normal(mu,sig,alpha):
-    #Computes of the -1 * kl divergence of a diagonal gaussians vs a alpha*normal gaussian
+    #Computes of the -1 * kl divergence of a diagonal gaussians vs an alpha*normal gaussian
     #Takes in an nxd vectors of means and diagonal covariances
     D = mu.shape[1]
     combined_mat = np.log(sig**2)-(mu**2+sig**2)/alpha**2
@@ -271,3 +268,14 @@ def load_and_pickle_binary_mnist():
     mnist_data = N_data, train_images, train_labels, test_images, test_labels
     with open('mnist_binary_data.pkl', 'w') as f:
         pickle.dump(mnist_data, f, 1)
+
+def create_banded_cov(d,b):
+    #Create a banded dxd covariance matrix with bandwidth b
+    cov = np.zeros((d,d))
+    for i in xrange(d):
+        for j in xrange(d):
+            if abs(i-j) < b:
+                cov[i,j] = 1.0/(abs(i-j)+1)**2
+    return cov
+
+

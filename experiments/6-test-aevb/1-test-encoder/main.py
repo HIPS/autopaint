@@ -16,7 +16,7 @@ from autopaint.util import WeightsParser, load_and_pickle_binary_mnist
 from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
 param_scale = 0.1
 samples_per_image = 1
-latent_dimensions = 2
+latent_dimensions = 10
 hidden_units = 500
 
 def run_aevb(train_images):
@@ -35,7 +35,7 @@ def run_aevb(train_images):
 
     # Optimize aevb
     batch_size = 100
-    num_training_iters = 160
+    num_training_iters = 1600
     rs = npr.RandomState(0)
 
     parser = WeightsParser()
@@ -46,6 +46,7 @@ def run_aevb(train_images):
     batch_idxs = make_batches(train_images.shape[0], batch_size)
 
     def batch_value_and_grad(weights, iter):
+        iter = iter % len(batch_idxs)
         cur_data = train_images[batch_idxs[iter]]
         return lower_bound(weights,encoder,decoder_log_like,N_weights_enc,cur_data,samples_per_image,latent_dimensions,rs)
     lb_grad = grad(batch_value_and_grad)
@@ -83,4 +84,3 @@ if __name__ == '__main__':
         N_data, train_images, train_labels, test_images, test_labels = pickle.load(f)
 
     decoder = run_aevb(train_images)
-

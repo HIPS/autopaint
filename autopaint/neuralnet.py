@@ -1,9 +1,12 @@
+import matplotlib.pyplot as plt
 import autograd.numpy as np
 import autograd.numpy.random as npr
 from autograd.scipy.misc import logsumexp
 from autograd import grad
 from autograd.util import quick_grad_check
 from autopaint.util import sigmoid
+from autopaint.plotting import plot_images
+
 
 def make_nn_funs(layer_sizes):
     shapes = zip(layer_sizes[:-1], layer_sizes[1:])
@@ -48,6 +51,15 @@ def make_binary_nn(layer_sizes):
 
     def likelihood(weights, inputs, targets):
         pred_probs = make_predictions(weights, inputs)
+        fig = plt.figure(1)
+        fig.clf()
+        ax = fig.add_subplot(111)
+        try:
+            samples = pred_probs.value
+        except:
+            samples = pred_probs
+        plot_images(samples, ax, ims_per_row=10)
+        plt.savefig('decoded_samples.png')
         label_probabilities = np.log(pred_probs)       * targets \
                             + np.log((1 - pred_probs)) * (1 - targets)
         return np.sum(label_probabilities, axis=1)   # Sum across pixels.
