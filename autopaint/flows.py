@@ -4,7 +4,7 @@
 import autograd.numpy as np
 from autograd import elementwise_grad
 
-from .util import WeightsParser, entropy_of_diagonal_gaussians
+from .util import WeightsParser, entropy_of_a_diagonal_gaussian
 
 nonlinearity = np.tanh
 nonlinearity_grad = elementwise_grad(nonlinearity)
@@ -29,18 +29,22 @@ def composed_flow(entropies, zs, output_weights, transform_weights, biases, call
 def build_flow_sampler(D, num_steps):
 
     parser = WeightsParser()
+    parser.add_shape('mean',  D)
+    parser.add_shape('log_stddev', D)
     parser.add_shape('output weights', (num_steps, D))
     parser.add_shape('transform weights', (num_steps, D))
     parser.add_shape('biases', (num_steps))
 
-    def flow_sample(params, means, stddevs, rs, callback=None):
+    def flow_sample(params, num_samples,rs ,callback=None):
+        mean = parser.get(params,'mean')
+        stddev = np.exp(parser.get(params,'log_stddev'))
         output_weights = parser.get(params, 'output weights')
         transform_weights = parser.get(params, 'transform weights')
         biases = parser.get(params, 'biases')
 
-        num_samples = np.shape(means)[0]
-        initial_entropies = entropy_of_diagonal_gaussians(stddevs)
-        init_zs = means + rs.randn(num_samples, D) * stddevs
+
+        initial_entropies = entropy_of_a_diagonal_gaussian(stddev)
+        init_zs = mean + rs.randn(num_samples, D) * stddev
         samples, entropy_estimates = composed_flow(initial_entropies, init_zs,
                                                    output_weights, transform_weights, biases, callback)
         return samples, entropy_estimates

@@ -276,7 +276,6 @@ def create_banded_cov(d,b):
         for j in xrange(d):
             if abs(i-j) < b:
                 cov[i,j] = 1.0/(abs(i-j)+1)**2
-    #Double check that it's PSD
-    np.linalg.cholesky(cov)
     return cov
+
 
