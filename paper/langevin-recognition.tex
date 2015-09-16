@@ -92,8 +92,8 @@
 \makeatother
 
 %\title{Langevin Flow for Gradient-based Nonparametric Variational Inference}
-\title{Langevin Nonparametric Variational Inference: Stochastic Gradient-based Approximation}
-
+%\title{Langevin Nonparametric Variational Inference: Stochastic Gradient-based Approximation}
+\title{Variational Inceptionism: Inferring Images with Gradient-based Recognition Networks}
 \author{}
 
 %\nipsfinalcopy
@@ -101,12 +101,17 @@
 \maketitle
 
 \begin{abstract}
-Variational autoencoders are a family of inference strategies that use a recognition network to quickly approximate conditional posteriors.
-Recently, these methods have been extended to produce non-parametric approximating distributions that can approach the true conditional posterior arbitrarily closely.
-However, existing techniques require parameterization and optimization of either the recognition network, or the entropy estimator required for the variational lower bound.
-We develop a family of nonparametric variational posteriors defined as the output of stochastic gradient descent with noise, also known as Langevin dynamics.
-These dynamics admit a parameter-free entropy lower bound, and adapt to the true posterior asymptotically without tuning.
-These properties make the Langevin flow sampler suitable for inference in high-dimensional spaces.
+%Variational autoencoders are a family of inference strategies that use a recognition network to quickly approximate conditional posteriors.
+%Recently, these methods have been extended to produce non-parametric approximating distributions that can approach the true conditional posterior arbitrarily closely.
+%However, existing techniques require parameterization and optimization of either the recognition network, or the entropy estimator required for the variational lower bound.
+%We develop a family of nonparametric variational posteriors defined as the output of stochastic gradient descent with noise, also known as Langevin dynamics.
+%These dynamics admit a parameter-free entropy lower bound, and adapt to the true posterior asymptotically without tuning.
+%These properties make the Langevin flow sampler suitable for inference in high-dimensional spaces.
+Recent work has shown that novel images can be constructed by gradient-based optimization of pixels to maximize a particular output of image classification networks.
+Recent work in variational autoencoders has also led to the development of encoders (aka recognition networks) which use likelihood gradients to efficiently sample from complex approximate posteriors.
+We propose a model architecture which combines these advances to allow inference of high-dimensional continuous structures, such as entire images or sounds, given only a prior and classification network.
+This architecture allows us to turn pre-trained convolutional networks for image classification into generative models of images of all classes.
+We demonstrate...
 \end{abstract}
 
 \section{Introduction}
