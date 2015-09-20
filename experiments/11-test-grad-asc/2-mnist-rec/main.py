@@ -14,7 +14,7 @@ from autopaint.util import load_mnist
 from autopaint.aevb import lower_bound
 from autopaint.util import WeightsParser, load_and_pickle_binary_mnist,build_logprob_mvn
 from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
-from autopaint.grad_asc import build_grad_sampler
+from autopaint.grad_asc import build_mult_grad_sampler
 param_scale = 0.1
 samples_per_image = 1
 latent_dimensions = 2
@@ -29,12 +29,13 @@ def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,sample
     log_normal = build_logprob_mvn(np.zeros(latent_dimensions), np.eye(latent_dimensions),pseudo_inv = True)
     def log_lik_func(z):
         return decode_log_like(dec_w,z,train_images)+log_normal(z)
-    samples, loglik_estimates, entropy_estimates = encode(enc_w,log_lik_func,rs,1)
+    samples, loglik_estimates, entropy_estimates = encode(weights,train_images,log_lik_func,rs,1)
     loglik_estimate = np.mean(loglik_estimates)
     entropy_estimate = np.mean(entropy_estimates)
     print "ll average", loglik_estimate
     print "ent average", entropy_estimate
     return loglik_estimate + entropy_estimate
+
 
 
 
@@ -44,26 +45,30 @@ def run_aevb(train_images):
     # Create aevb function
     # Training parameters
 
+
+
     D = train_images.shape[1]
-
-    dec_layers = [latent_dimensions, hidden_units, D]
-
-    init_mean = np.zeros(latent_dimensions)
-    init_log_stddevs = np.log(.1*np.ones(latent_dimensions))
-    init_log_stepsize = np.log(0.01)
-
     rs = np.random.npr.RandomState(0)
-    sample_and_run_grad, parser = build_grad_sampler(latent_dimensions,10, approx=True)
-    N_weights_dec, decoder, decoder_log_like = make_binary_nn(dec_layers)
-    N_weights_enc = len(parser)
-    encoder = sample_and_run_grad
-    parser.add_shape('decoding weights', (N_weights_dec,))
+    sample_and_run_grad = build_mult_grad_sampler(latent_dimensions,1, approx=True)
 
-    params = np.zeros(len(parser))
-    parser.put(params, 'mean', init_mean)
-    parser.put(params, 'log_stddev', init_log_stddevs)
-    parser.put(params, 'log_stepsize', init_log_stepsize)
-    parser.put(params, 'decoding weights',rs.randn(N_weights_dec) * param_scale)
+    enc_layers = [D, hidden_units, 2*latent_dimensions]
+    dec_layers = [latent_dimensions, hidden_units, D]
+    N_weights_NN, encoder_NN, encoder_log_like_NN = make_gaussian_nn(enc_layers)
+    N_weights_dec, decoder, decoder_log_like = make_binary_nn(dec_layers)
+    encoder = sample_and_run_grad
+
+    #Create parser
+    parser = WeightsParser()
+    parser.add_shape('encoding network weights', (N_weights_NN,))
+    N_weights_enc = len(parser)
+    parser.add_shape('decoding weights', (N_weights_dec,))
+    params = rs.randn(len(parser)) * param_scale
+
+    def two_part_encode(params,data,log_lik_func,rs,num_samples):
+        network_weights = parser.get(params, 'encoding network weights')
+        (mus,log_sigs) = encoder_NN(network_weights,data)
+        sigs = np.exp(log_sigs)
+        return sample_and_run_grad(mus,sigs,.01, log_lik_func,rs, num_samples)
 
     # Optimize aevb
     batch_size = 100
@@ -75,7 +80,7 @@ def run_aevb(train_images):
     def batch_value_and_grad(weights, iter):
         iter = iter % len(batch_idxs)
         cur_data = train_images[batch_idxs[iter]]
-        return lower_bound(weights,encoder,decoder_log_like,N_weights_enc,cur_data,samples_per_image,latent_dimensions,rs)
+        return lower_bound(weights,two_part_encode,decoder_log_like,N_weights_enc,cur_data,samples_per_image,latent_dimensions,rs)
     lb_grad = grad(batch_value_and_grad)
 
     def callback(params, i, grad):

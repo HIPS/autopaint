@@ -8,7 +8,7 @@ from autograd import elementwise_grad
 
 from autopaint.util import WeightsParser, \
     entropy_of_a_diagonal_gaussian, entropy_of_a_spherical_gaussian, \
-    sum_entropy_lower_bound, exact_log_det, approx_log_det
+    sum_entropy_lower_bound, exact_log_det, approx_log_det,entropy_of_diagonal_gaussians
 
 
 def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):
@@ -32,14 +32,13 @@ def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):
     return xs, delta_entropy
 
 
-def gradient_ascent_entropic(gradfun, entropies, xs, stepsizes, rs, callback, approx):
+def gradient_ascent_entropic(gradfun, entropies, xs, stepsizes,num_steps, rs, callback, approx):
     (N, D) = xs.shape
-    num_steps = len(stepsizes)
 
     for t in xrange(num_steps):
         if callback: callback(xs=xs, t=t, entropy=delta_entropy)
         grad_step_start = time.time()
-        xs, delta_entropy = gradient_step_track_entropy(gradfun, xs, stepsizes[t], rs, approx=approx)
+        xs, delta_entropy = gradient_step_track_entropy(gradfun, xs, stepsizes, rs, approx=approx)
         # Update entropy estimate.
         entropies += delta_entropy
 
@@ -64,10 +63,31 @@ def build_grad_sampler( D, num_steps, approx):
         init_xs = mean + rs.randn(num_samples, D) * stddevs
         samples, entropy_estimates = \
             gradient_ascent_entropic(gradfun, entropies=initial_entropies, xs=init_xs,
-                                     stepsizes=stepsizes,
+                                     stepsizes=stepsizes,num_steps=num_steps,
                                      rs=rs, callback=callback, approx=approx)
 
         loglik_estimates = loglik_func(samples)
         return samples, loglik_estimates, entropy_estimates
 
     return sample_and_run_grad, parser
+
+
+def build_mult_grad_sampler( D, num_steps, approx):
+
+
+
+
+    def sample_and_run_grad(means,stddevs,stepsize, loglik_func,rs, num_samples, callback=None):
+        gradfun = elementwise_grad(loglik_func)
+        initial_entropies = entropy_of_diagonal_gaussians(stddevs)
+        assert (rs.randn(means.shape[0], D) * stddevs).shape == means.shape
+        init_xs = means + rs.randn(means.shape[0], D) * stddevs
+        samples, entropy_estimates = \
+            gradient_ascent_entropic(gradfun, entropies=initial_entropies, xs=init_xs,
+                                     stepsizes=stepsize,num_steps=num_steps,
+                                     rs=rs, callback=callback, approx=approx)
+
+        loglik_estimates = loglik_func(samples)
+        return samples, loglik_estimates, entropy_estimates
+
+    return sample_and_run_grad
