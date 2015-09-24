@@ -34,23 +34,30 @@ def gradient_step_track_entropy(gradfun, xs, stepsize, rs, approx):
 
 def gradient_ascent_entropic(gradfun, loglik,entropies, xs, step_size, rs, callback, approx):
     prevL = -np.inf
-    curL = loglik(xs)+entropies
+    num_samples = entropies.shape[0]
+    curL = np.mean(loglik(xs)+entropies)
+    halfL = np.mean(loglik(xs)[0:.5*num_samples]+entropies[0:.5*num_samples])
+
     curIter = 0
-    while curL > prevL:
+    while halfL > prevL:
         if curIter % 10 == 0:
             print 'grad step',curIter
+            print 'cur ent', np.mean(entropies[.5*num_samples:num_samples])
+            print 'cur ll', np.mean(loglik(xs)[.5*num_samples:num_samples])
         if callback: callback(xs=xs, t=t, entropy=delta_entropy)
         new_xs, delta_entropy = gradient_step_track_entropy(gradfun, xs,step_size, rs, approx=approx)
         # Update entropy estimate.
         new_entropies = delta_entropy+entropies
-        prevL = curL
+        prevL = halfL
         new_loglik = loglik(new_xs)
-        curL = new_loglik+new_entropies
-        if curL > prevL:
+        curL = np.mean(new_loglik+new_entropies)
+        halfL = np.mean(loglik(xs)[0:.5*num_samples]+entropies[0:.5*num_samples])
+        if halfL > prevL:
             xs = new_xs
             entropies = new_entropies
         curIter += 1
-    return xs, entropies
+    print 'difference', np.mean(loglik(xs)[0:.5*num_samples]+entropies[0:.5*num_samples])-np.mean(loglik(xs)[.5*num_samples:num_samples]+entropies[.5*num_samples:num_samples])
+    return xs[.5*num_samples:num_samples], entropies[.5*num_samples:num_samples]
 
 def build_early_stop( D, approx):
 
@@ -63,6 +70,7 @@ def build_early_stop( D, approx):
 
 
     def sample_and_run_early_stop(params, loglik_func, rs, num_samples, callback=None):
+        num_samples = 2*num_samples
         gradfun = elementwise_grad(loglik_func)
         mean                   = parser.get(params, 'mean')
         stddevs         = np.exp(parser.get(params, 'log_stddev'))

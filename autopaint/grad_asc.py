@@ -53,14 +53,14 @@ def build_grad_sampler( D, num_steps, approx):
     parser.add_shape('log_stddev', D)
     parser.add_shape('log_stepsize', 1)
 
-    def sample_and_run_grad(params, loglik_func,rs, num_samples, callback=None):
+    def sample_and_run_grad(params, loglik_func,rs,  num_images,samples_per_image, callback=None):
         gradfun = elementwise_grad(loglik_func)
         mean                   = parser.get(params, 'mean')
         stddevs         = np.exp(parser.get(params, 'log_stddev'))
         stepsizes       = np.exp(parser.get(params, 'log_stepsize'))
 
-        initial_entropies = np.full(num_samples, entropy_of_a_diagonal_gaussian(stddevs))
-        init_xs = mean + rs.randn(num_samples, D) * stddevs
+        initial_entropies = np.full(num_images*samples_per_image, entropy_of_a_diagonal_gaussian(stddevs))
+        init_xs = mean + rs.randn(num_images*samples_per_image, D) * stddevs
         samples, entropy_estimates = \
             gradient_ascent_entropic(gradfun, entropies=initial_entropies, xs=init_xs,
                                      stepsizes=stepsizes,num_steps=num_steps,
@@ -77,7 +77,7 @@ def build_mult_grad_sampler( D, num_steps, approx):
 
 
 
-    def sample_and_run_grad(means,stddevs,stepsize, loglik_func,rs, num_samples, callback=None):
+    def sample_and_run_grad(means,stddevs,stepsize, loglik_func,rs, num_images,samples_per_image, callback=None):
         gradfun = elementwise_grad(loglik_func)
         initial_entropies = entropy_of_diagonal_gaussians(stddevs)
         assert (rs.randn(means.shape[0], D) * stddevs).shape == means.shape
