@@ -6,6 +6,7 @@ from autograd import grad
 from autograd.util import quick_grad_check
 from autopaint.util import sigmoid
 from autopaint.plotting import plot_images
+from scipy import var
 
 
 def make_nn_funs(layer_sizes):

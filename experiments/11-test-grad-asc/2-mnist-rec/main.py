@@ -17,7 +17,7 @@ from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
 from autopaint.grad_asc import build_mult_grad_sampler
 param_scale = 0.1
 samples_per_image = 1
-latent_dimensions = 2
+latent_dimensions = 5
 hidden_units = 500
 
 import autograd.numpy as np
@@ -29,7 +29,7 @@ def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,sample
     log_normal = build_logprob_mvn(np.zeros(latent_dimensions), np.eye(latent_dimensions),pseudo_inv = True)
     def log_lik_func(z):
         return decode_log_like(dec_w,z,train_images)+log_normal(z)
-    samples, loglik_estimates, entropy_estimates = encode(weights,train_images,log_lik_func,rs,1)
+    samples, loglik_estimates, entropy_estimates = encode(weights,train_images,log_lik_func,rs,0)
     loglik_estimate = np.mean(loglik_estimates)
     entropy_estimate = np.mean(entropy_estimates)
     print "ll average", loglik_estimate

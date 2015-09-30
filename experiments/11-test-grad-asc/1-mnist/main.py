@@ -1,3 +1,13 @@
+# def log_lik_func_single_sample(z,i):
+#     # train_images_repeat = np.repeat(train_images,samples_per_image,axis=0)
+#     assert z.shape[0] == 1
+#     return decode_log_like(dec_w,z,train_images[i,:])+log_normal(z)
+# single_grad = grad(log_lik_func_single_sample)
+# ele_grad = elementwise_grad(log_lik_func)
+# print single_grad(1.0*np.zeros((1,2)),0) - ele_grad(1.0*np.zeros((100,2)))[0,:]
+# kill
+
+
 import pickle
 import time
 import matplotlib.pyplot as plt
@@ -5,10 +15,12 @@ import matplotlib.pyplot as plt
 import autograd.numpy.random as npr
 import autograd.numpy as np
 
-from autograd import grad
+from autograd import grad, elementwise_grad
+from autograd.util import quick_grad_check
+
 
 from autopaint.plotting import plot_images
-from autopaint.optimizers import adam
+from autopaint.optimizers import adam, sga_momentum,adadelta
 from autopaint.neuralnet import make_batches
 from autopaint.util import load_mnist
 from autopaint.aevb import lower_bound
@@ -17,8 +29,8 @@ from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
 from autopaint.grad_asc import build_grad_sampler
 param_scale = 0.1
 samples_per_image = 1
-latent_dimensions = 2
-hidden_units = 500
+latent_dimensions = 10
+hidden_units = 300
 
 import autograd.numpy as np
 from autopaint.util import neg_kl_diag_normal
@@ -27,9 +39,14 @@ def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,sample
     enc_w = weights[0:N_weights_enc]
     dec_w = weights[N_weights_enc:len(weights)]
     log_normal = build_logprob_mvn(np.zeros(latent_dimensions), np.eye(latent_dimensions),pseudo_inv = True)
+
     def log_lik_func(z):
-        return decode_log_like(dec_w,z,train_images)+log_normal(z)
-    samples, loglik_estimates, entropy_estimates = encode(enc_w,log_lik_func,rs,1)
+        # train_images_repeat = np.repeat(train_images,samples_per_image,axis=0)
+        assert z.shape[0] == train_images.shape[0]
+        return decode_log_like(dec_w,z,train_images) +log_normal(z)
+
+
+    samples, loglik_estimates, entropy_estimates = encode(enc_w,log_lik_func,rs,num_images=train_images.shape[0],samples_per_image=samples_per_image)
     loglik_estimate = np.mean(loglik_estimates)
     entropy_estimate = np.mean(entropy_estimates)
     print "ll average", loglik_estimate
@@ -41,19 +58,20 @@ def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,sample
 def run_aevb(train_images):
     start_time = time.time()
 
+
     # Create aevb function
     # Training parameters
 
     D = train_images.shape[1]
 
-    dec_layers = [latent_dimensions, hidden_units, D]
+    dec_layers = [latent_dimensions, hidden_units,hidden_units, D]
 
     init_mean = np.zeros(latent_dimensions)
-    init_log_stddevs = np.log(.1*np.ones(latent_dimensions))
-    init_log_stepsize = np.log(0.01)
+    init_log_stddevs = np.log(1*np.ones(latent_dimensions))
+    init_log_stepsize = np.log(.01)
 
     rs = np.random.npr.RandomState(0)
-    sample_and_run_grad, parser = build_grad_sampler(latent_dimensions,10, approx=True)
+    sample_and_run_grad, parser = build_grad_sampler(latent_dimensions,20, approx=True)
     N_weights_dec, decoder, decoder_log_like = make_binary_nn(dec_layers)
     N_weights_enc = len(parser)
     encoder = sample_and_run_grad
@@ -80,7 +98,12 @@ def run_aevb(train_images):
 
     def callback(params, i, grad):
         ml = batch_value_and_grad(params,i)
-        print "log marginal likelihood:", ml
+        print "---- log marginal likelihood:", ml
+
+        #Print params
+        print 'norm of stdev', np.linalg.norm(np.exp(parser.get(params, 'mean')))
+        print 'stepsize' , np.exp(parser.get(params,'log_stepsize'))
+
 
         #Generate samples
         num_samples = 100
@@ -95,6 +118,7 @@ def run_aevb(train_images):
         plt.savefig('samples.png')
 
     final_params = adam(lb_grad, params, num_training_iters, callback=callback)
+    # final_params = adadelta(lb_grad, params, num_training_iters, callback=callback)
 
     def decoder_with_weights(zs):
         return decoder(parser.get(final_params, 'decoding weights'), zs)

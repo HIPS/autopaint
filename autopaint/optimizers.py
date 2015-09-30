@@ -14,7 +14,7 @@ def sga_momentum(grad, x, num_iters=200, step_size=0.1, mass=0.9, callback=None)
     grad() must have signature grad(x, i), where i is the iteration number."""
     velocity = np.zeros(len(x))
     for i in range(num_iters):
-        g = grad(x)
+        g = grad(x,i)
         if callback: callback(x, i, g)
         velocity = mass * velocity - (1.0 - mass) * g
         x = x + step_size * velocity

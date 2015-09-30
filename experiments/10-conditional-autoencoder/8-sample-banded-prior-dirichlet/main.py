@@ -93,8 +93,6 @@ if __name__ == '__main__':
     D = train_images.shape[1]
 
     enc_layers = [D, hidden_units, 2*latent_dimensions]
-    dec_layers = [latent_dimensions, hidden_units, D]
-
     N_weights_enc, encoder, encoder_log_like = make_gaussian_nn(enc_layers)
 
 

@@ -107,6 +107,7 @@ if __name__ == '__main__':
     num_weights, make_predictions, likelihood = make_classification_nn(layer_sizes)
     classifier_loglik = lambda image, c: make_predictions(trained_weights, np.atleast_2d(image))[:, c]
 
+
     image_prior = build_logprob_mvn(all_mean, banded_cov)
     # Combine prior and likelihood.
     model_ll = lambda image, c: image_prior(image) +classifier_loglik(image, c)
@@ -117,8 +118,8 @@ if __name__ == '__main__':
     model_nll_with_grad = value_and_grad(model_nll)
 
    # Optimize a random image to maximize this likelihood.
-    cur_class = 0
-    start_image = np.ones((28*28))
+    cur_class = 1
+    start_image = np.ones((28*28)) #all_mean
     # quick_grad_check(data_L, start_image)
 
     def callback(image):

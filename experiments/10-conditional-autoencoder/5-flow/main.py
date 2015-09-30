@@ -59,13 +59,13 @@ if __name__ == '__main__':
     model_ll = lambda image, c: image_prior(image) +classifier_loglik(image, c)
 
     num_samples = 100
-    num_steps = 32
-    num_sampler_optimization_steps = 400
+    num_steps = 320
+    num_sampler_optimization_steps = 4000
     sampler_learn_rate = 0.01
 
     D = 784
-    init_mean = np.zeros(D)
-    init_log_stddevs = np.log(0.1*np.ones(D))
+    init_mean = all_mean
+    init_log_stddevs = np.log(.1*np.ones(D))
     init_output_weights = 0.1*rs.randn(num_steps, D)
     init_transform_weights = 0.1*rs.randn(num_steps, D)
     init_biases = 0.1*rs.randn(num_steps)

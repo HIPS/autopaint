@@ -29,11 +29,11 @@ from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
 from autopaint.early_stop import build_early_stop
 param_scale = 0.1
 samples_per_image = 10
-latent_dimensions = 10
+latent_dimensions = 50
 hidden_units = 500
 
 def get_pretrained_dec_w():
-   with open('parameters.pkl') as f:
+   with open('parameters50.pkl') as f:
         parameters = pickle.load(f)
    params,N_weights_enc,samples_per_image,latent_dimensions,rs = parameters
    dec_w = params[N_weights_enc:len(params)]
@@ -78,11 +78,11 @@ def run_aevb(train_images):
 
     D = train_images.shape[1]
 
-    dec_layers = [latent_dimensions, hidden_units,hidden_units, D]
+    dec_layers = [latent_dimensions,hidden_units,hidden_units, D]
 
     init_mean = np.zeros(latent_dimensions)
     init_log_stddevs = np.log(1.0*np.ones(latent_dimensions))
-    init_log_stepsize = np.log(.001)
+    init_log_stepsize = np.log(.005)
 
     rs = np.random.npr.RandomState(0)
     sample_and_run_es, parser =build_early_stop( latent_dimensions,  approx=True)
@@ -116,13 +116,14 @@ def run_aevb(train_images):
     def callback(params, i, grad):
         n_iter= 0.0
         sum_ml = 0
-        for j in xrange(0,10):
+        for j in xrange(0,100):
             ml = batch_value_and_grad(params,j)
             print "---- log marginal likelihood:", ml
             n_iter += 1
             sum_ml += ml
             print '-------- avg_ml', sum_ml/n_iter
 
+        kill
         #Print params
         print 'norm of stdev', np.linalg.norm(np.exp(parser.get(params, 'mean')))
         print 'stepsize' , np.exp(parser.get(params,'log_stepsize'))
@@ -158,5 +159,5 @@ if __name__ == '__main__':
         N_data, train_images, train_labels, test_images, test_labels = pickle.load(f)
 
 
-    decoder = run_aevb(train_images)
+    decoder = run_aevb(test_images)
 

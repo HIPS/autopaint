@@ -31,7 +31,7 @@ def lower_bound(weights,encode,decode_log_like,N_weights_enc,train_images,sample
     for idx in xrange(train_images.shape[0]):
         x = train_images[idx,:]
         def log_lik_func(z):
-            return decode_log_like(dec_w,z,x)+log_normal(z)
+            return decode_log_like(dec_w,z,x) +log_normal(z)
         sample, loglik_estimate, entropy_estimate = encode(enc_w,log_lik_func,rs,1)
         if idx == 0:
             samples = sample
@@ -62,7 +62,7 @@ def run_aevb(train_images):
     init_log_stepsize = np.log(0.01)
 
     rs = np.random.npr.RandomState(0)
-    sample_and_run_early_stop, parser = build_early_stop(latent_dimensions, approx=False)
+    sample_and_run_early_stop, parser = build_early_stop(latent_dimensions, approx=True)
     N_weights_dec, decoder, decoder_log_like = make_binary_nn(dec_layers)
     N_weights_enc = len(parser)
     encoder = sample_and_run_early_stop

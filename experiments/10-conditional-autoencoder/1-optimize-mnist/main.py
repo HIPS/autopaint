@@ -17,17 +17,32 @@ from autopaint.util import load_mnist
 from autopaint.aevb import lower_bound
 from autopaint.util import WeightsParser, load_and_pickle_binary_mnist
 from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
+from autopaint.util import sigmoid
+
 param_scale = 0.1
-samples_per_image = 1
-latent_dimensions = 10
+samples_per_image = 10
+latent_dimensions = 50
 hidden_units = 500
 
+def parameterize_image(image):
+    #Takes an image and applies a sigmoid to enforce the values to be in [0,1]
+    return sigmoid(image)
 
-def create_prob_of_data(parameters,encoder,decoder_log_like):
+
+
+def create_prob_of_data(parameters,encoder,decoder_log_like,num_gauss_samples=1000):
     params,N_weights_enc,samples_per_image,latent_dimensions,rs = parameters
+    dec_w = params[N_weights_enc:len(params)]
+
     def data_L(data):
+        #Convert data into (0,1) pixel space
         data = np.atleast_2d(data)
-        return lower_bound(params,encoder,decoder_log_like,N_weights_enc,data,samples_per_image,latent_dimensions,rs)
+        #Draw samples from Z ~ N(0,I)
+        Z = rs.randn(num_gauss_samples,latent_dimensions)
+        #Compute probability by integrating out over z
+        data_repeat = np.repeat(data,num_gauss_samples,axis=0)
+        mean_log_prob = np.mean(decoder_log_like(dec_w,Z,data_repeat))
+        return mean_log_prob
     return data_L
 
 def run_aevb(train_images):
@@ -68,10 +83,16 @@ def run_aevb(train_images):
 
     final_params = adam(lb_grad, initial_combined_weights, num_training_iters, callback=callback)
 
+    #Validation loss:
+    print '--- test loss:', lower_bound(final_params,encoder,decoder_log_like,N_weights_enc,test_images[0:100,:],samples_per_image,latent_dimensions,rs)
+
 
 
     parameters = final_params,N_weights_enc,samples_per_image,latent_dimensions,rs
-    with open('parameters.pkl', 'w') as f:
+    save_string = 'parameters50.pkl'
+    print 'SAVING AS: ', save_string
+    print 'LATENTS DIMS', latent_dimensions
+    with open(save_string, 'w') as f:
         pickle.dump(parameters, f, 1)
 
     finish_time = time.time()
@@ -87,40 +108,42 @@ if __name__ == '__main__':
 
     D = train_images.shape[1]
 
-    enc_layers = [D, hidden_units, 2*latent_dimensions]
-    dec_layers = [latent_dimensions, hidden_units, D]
+    enc_layers = [D, hidden_units,hidden_units,2*latent_dimensions]
+    dec_layers = [latent_dimensions,hidden_units,hidden_units, D]
 
     N_weights_enc, encoder, encoder_log_like = make_gaussian_nn(enc_layers)
     N_weights_dec, decoder, decoder_log_like = make_binary_nn(dec_layers)
 
-    # run_aevb(train_images)
-    with open('parameters.pkl') as f:
+    run_aevb(train_images)
+    with open('parameters20.pkl') as f:
         parameters = pickle.load(f)
 
     with open('mnist_models.pkl') as f:
         trained_weights, all_mean, all_cov = pickle.load(f)
 
    # Build likelihood model.
-    L2_reg = 1
+    L2_reg = 9
     layer_sizes = [784, 200, 100, 10]
     num_weights, make_predictions, likelihood = make_classification_nn(layer_sizes)
     classifier_loglik = lambda image, c: make_predictions(trained_weights, np.atleast_2d(image))[:, c]
 
     data_L = create_prob_of_data(parameters,encoder,decoder_log_like)
     # Combine prior and likelihood.
-    model_ll = lambda image, c: data_L(image) +classifier_loglik(image, c)
+    model_ll = lambda image, c: data_L(image)   +classifier_loglik(image, c)
 
     def model_nll(image,c):
+        image = parameterize_image(image)
         return -1*model_ll(image,c)
 
     model_nll_with_grad = value_and_grad(model_nll)
 
    # Optimize a random image to maximize this likelihood.
-    cur_class = 2
-    start_image = np.zeros((28*28))
+    cur_class = 3
+    start_image = np.zeros(784)
     # quick_grad_check(data_L, start_image)
 
     def callback(image):
+        image = parameterize_image(image)
         #print "Cur loglik: ", image_prior_nll(image), "mean loglik:", image_prior_nll(all_mean)
         matplotlib.image.imsave("optimizing", image.reshape((28,28)))
 
