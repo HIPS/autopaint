@@ -45,7 +45,7 @@ if __name__ == '__main__':
     init_biases = 0.1*rs.randn(num_steps)
 
     logprob_mvn = build_logprob_mvn(mean=np.array([0.2,0.4]), cov=np.array([[1.0,0.9], [0.9,1.0]]))
-    flow_sample, parser = build_flow_sampler(logprob_mvn, D, num_steps)
+    flow_sample, parser = build_flow_sampler(D, num_steps)
 
     sampler_params = np.zeros(len(parser))
     parser.put(sampler_params, 'mean', init_mean)
@@ -55,7 +55,8 @@ if __name__ == '__main__':
     parser.put(sampler_params, 'biases', init_biases)
 
     def get_batch_marginal_likelihood_estimate(sampler_params):
-        samples, likelihood_estimates, entropy_estimates = flow_sample(sampler_params, rs, num_samples)
+        samples, entropy_estimates = flow_sample(sampler_params, num_samples,rs)
+        likelihood_estimates = logprob_mvn(samples)
         print "Mean loglik:", np.mean(likelihood_estimates.value),\
               "Mean entropy:", np.mean(entropy_estimates.value)
         plot_density(samples.value, "approximating_dist.png")
