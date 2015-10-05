@@ -167,6 +167,7 @@ def entropy_of_a_gaussian(cov):
 def entropy_of_a_diagonal_gaussian(stddevs):
     stddevs = stddevs.flatten()
     D = len(stddevs)
+    assert 0.5 * D * (1.0 + np.log(2*np.pi)) + np.sum(np.log(stddevs)) == entropy_of_diagonal_gaussians(stddevs)
     return 0.5 * D * (1.0 + np.log(2*np.pi)) + np.sum(np.log(stddevs))
 
 def entropy_of_diagonal_gaussians(stddevs_mat):
@@ -174,7 +175,6 @@ def entropy_of_diagonal_gaussians(stddevs_mat):
     if len(stddevs_mat.shape) == 1:
         stddevs_mat = np.atleast_2d(stddevs_mat)
     D = stddevs_mat.shape[1]
-    assert entropy_of_a_diagonal_gaussian(stddevs_mat) == 0.5 * D * (1.0 + np.log(2*np.pi)) + np.sum(np.log(stddevs_mat), axis=1)
     return 0.5 * D * (1.0 + np.log(2*np.pi)) + np.sum(np.log(stddevs_mat), axis=1)
 
 

@@ -57,7 +57,7 @@ def gradient_ascent_entropic(gradfun, loglik,entropies, xs, step_size, rs, callb
             xs = new_xs
             entropies = new_entropies
         curIter += 1
-    # print 'difference', np.mean(loglik(xs)[0:.5*num_samples]+entropies[0:.5*num_samples])-np.mean(loglik(xs)[.5*num_samples:num_samples]+entropies[.5*num_samples:num_samples])
+    print 'difference', np.mean(loglik(xs)[0:.5*num_samples]+entropies[0:.5*num_samples])-np.mean(loglik(xs)[.5*num_samples:num_samples]+entropies[.5*num_samples:num_samples])
     return xs[.5*num_samples:num_samples], entropies[.5*num_samples:num_samples]
 
 
@@ -98,6 +98,28 @@ def build_early_stop_fixed_params( D, approx,mean,log_stddevs,log_stepsize):
 
 
     def sample_and_run_early_stop(params, loglik_func, rs, num_samples, callback=None):
+        num_samples = 2*num_samples
+        gradfun = elementwise_grad(loglik_func)
+
+        stddevs = np.exp(log_stddevs)
+        stepsize = np.exp(log_stepsize)
+        initial_entropies = np.full(num_samples, entropy_of_a_diagonal_gaussian(stddevs))
+        init_xs = mean + rs.randn(num_samples, D) * stddevs
+
+        samples, entropy_estimates = \
+            gradient_ascent_entropic(gradfun,loglik = loglik_func, entropies=initial_entropies, xs=init_xs,
+                                     step_size=stepsize,
+                                     rs=rs, callback=callback, approx=approx)
+        loglik_estimates = loglik_func(samples)
+        return samples, loglik_estimates, entropy_estimates
+
+    return sample_and_run_early_stop
+
+def build_early_stop_input_params( D, approx,log_stepsize):
+
+
+
+    def sample_and_run_early_stop(mean,log_stddevs, loglik_func, rs, num_samples, callback=None):
         num_samples = 2*num_samples
         gradfun = elementwise_grad(loglik_func)
 
