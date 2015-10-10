@@ -67,20 +67,15 @@ def build_flow_sampler_with_inputs(D, num_steps):
         biases = parser.get(params, 'biases')
         stddevs_repeat = np.repeat(stddevs,num_samples,axis=0)
         initial_entropies = entropy_of_diagonal_gaussians(stddevs_repeat)
+        # initial_entropies = entropy_of_diagonal_gaussians(stddevs
+        rs = np.random.RandomState(0)
         noise = rs.randn(num_samples,batch_size,D)
         init_zs = means + stddevs*noise
         init_zs = np.reshape(init_zs,(batch_size*num_samples,D),order = 'F')
-        # output_weights = parser.get(params, 'output weights')
-        # transform_weights = parser.get(params, 'transform weights')
-        # biases = parser.get(params, 'biases')
-        # stddevs = np.exp(log_stddevs)
-        #
-        #
-        # initial_entropies = entropy_of_a_diagonal_gaussian(stddevs)
-        # init_zs = means + rs.randn(num_samples, D) * stddevs
-        #
+        return init_zs,initial_entropies
+
         samples, entropy_estimates = composed_flow(initial_entropies, init_zs,
                                                    output_weights, transform_weights, biases, callback)
-        return samples, entropy_estimates
+        # return samples, entropy_estimates
 
     return flow_sample, parser

@@ -1,33 +1,56 @@
-# Main demo script
-import time
 import pickle
-
+import time
 import matplotlib.pyplot as plt
 
+import autograd.numpy.random as npr
 import autograd.numpy as np
+
 from autograd import grad
+from autograd.util import quick_grad_check
 
-from autopaint.flows import build_flow_sampler_with_inputs
-from autopaint.neuralnet import make_batches, make_gaussian_nn,make_binary_nn
-from autopaint.util import sample_from_normal_bimodal, load_and_pickle_binary_mnist
 from autopaint.plotting import plot_images
-from autopaint.optimizers import adam, adadelta,adagrad
-
-#AEVB params
+from autopaint.optimizers import adam
+from autopaint.neuralnet import make_batches
+from autopaint.util import load_mnist, entropy_of_diagonal_gaussians
+from autopaint.util import WeightsParser, load_and_pickle_binary_mnist,build_logprob_standard_normal
+from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
+from autopaint.flows import build_flow_sampler_with_inputs
 param_scale = 0.1
 samples_per_image = 1
-latent_dimensions = 40
-hidden_units = 100
+latent_dimensions = 5
+hidden_units = 500
 
-if __name__ == '__main__':
+def lower_bound(weights,parser,flow_sample,encode,decode_log_like,log_prior,N_weights_enc,train_images,samples_per_image,latent_dimensions,rs):
+    mean_log_joint,mean_ent = compute_log_prob_and_ent(weights,parser,flow_sample,encode,decode_log_like,log_prior,train_images,samples_per_image,latent_dimensions,rs)
+    print "joint ll average",mean_log_joint
+    print "ent average", mean_ent
 
+    return mean_log_joint + mean_ent
+
+def compute_log_prob_and_ent(weights,parser,flow_sample,encode,decode_log_like,log_prior,train_images,samples_per_image,latent_dimensions,rs):
+    enc_w = parser.get(weights, 'encoder weights')
+    dec_w = parser.get(weights, 'decoder weights')
+    (mus,log_sigs) = encode(enc_w,train_images)
+    sigs = np.exp(log_sigs)
+
+    noise = rs.randn(samples_per_image,train_images.shape[0],latent_dimensions)
+    Z_samples2 = mus + sigs*noise
+    Z_samples2 = np.reshape(Z_samples2,(train_images.shape[0]*samples_per_image,latent_dimensions),order = 'F')
+    Z_samples, entropy_estimates = flow_sample(weights,mus,log_sigs,samples_per_image,rs)
+    mean_ent = np.mean(entropy_estimates)
+    train_images_repeat = np.repeat(train_images,samples_per_image,axis=0)
+    mean_log_prob = np.mean(decode_log_like(dec_w,Z_samples,train_images_repeat) +log_prior(Z_samples))
+    mean_log_prob2 = np.mean(decode_log_like(dec_w,Z_samples2,train_images_repeat) +log_prior(Z_samples2))
+    mean_ent2 = np.mean(entropy_of_diagonal_gaussians(sigs))
+    return mean_log_prob, mean_ent
+
+
+def run_aevb(train_images):
     start_time = time.time()
-    rs = np.random.npr.RandomState(0)
-    #load_and_pickle_binary_mnist()
-    with open('../../../autopaint/mnist_binary_data.pkl') as f:
-        N_data, train_images, train_labels, test_images, test_labels = pickle.load(f)
 
-    #Create aevb function
+    # Create aevb function
+    # Training parameters
+
     D = train_images.shape[1]
 
     enc_layers = [D, hidden_units, 2*latent_dimensions]
@@ -36,12 +59,11 @@ if __name__ == '__main__':
     N_weights_enc, encoder, encoder_log_like = make_gaussian_nn(enc_layers)
     N_weights_dec, decoder, decoder_log_like = make_binary_nn(dec_layers)
 
-    #Optimize aevb
+    # Optimize aevb
     batch_size = 100
-    num_train_iters = 1000
-    num_steps = 1
-    num_sampler_optimization_steps = 400
-    sampler_learn_rate = 0.01
+    num_training_iters = 1600
+    rs = npr.RandomState(0)
+    num_steps = 0
 
     init_enc_w = rs.randn(N_weights_enc) * param_scale
     init_dec_w = rs.randn(N_weights_dec) * param_scale
@@ -61,43 +83,51 @@ if __name__ == '__main__':
     parser.put(sampler_params,'decoder weights', init_dec_w)
     batch_idxs = make_batches(train_images.shape[0], batch_size)
 
-    def get_batch_lower_bound(cur_sampler_params, iter):
+    log_prior = build_logprob_standard_normal(latent_dimensions)
+    def batch_value_and_grad(weights, iter):
         iter = iter % len(batch_idxs)
         cur_data = train_images[batch_idxs[iter]]
-        #Create an initial encoding of sample images:
-        enc_w = parser.get(cur_sampler_params, 'encoder weights')
-        (mus,log_sigs) = encoder(enc_w,cur_data)
-        #Take mean of encodings and sigs and use this to generate samples, should return only entropy
-        samples, entropy_estimates = flow_sample(cur_sampler_params,mus,log_sigs,samples_per_image,rs)
-        #From samples decode them and compute likelihood
-        dec_w = parser.get(cur_sampler_params, 'decoder weights')
-        train_images_repeat = np.repeat(cur_data,samples_per_image,axis=0)
-        loglike = np.mean(decoder_log_like(dec_w,samples,train_images_repeat))
-        print "Mean loglik:", loglike,\
-        "Mean entropy:", np.mean(entropy_estimates)
-        return np.mean(entropy_estimates)+loglike
+        return lower_bound(weights,parser,flow_sample,encoder,decoder_log_like,log_prior,N_weights_enc,cur_data,samples_per_image,latent_dimensions,rs)
+    lb_grad = grad(batch_value_and_grad)
+
+    def lb_grad_check(weights):
+        return batch_value_and_grad(weights,0)
+    quick_grad_check(lb_grad_check,sampler_params)
+    print 'checked!'
+    kill
 
     def callback(params, i, grad):
-        ml = get_batch_lower_bound(params,i)
+        ml = batch_value_and_grad(params,i)
         print "log marginal likelihood:", ml
-
         #Generate samples
         num_samples = 100
         images_per_row = 10
         zs = rs.randn(num_samples,latent_dimensions)
         samples = decoder(parser.get(params, 'decoder weights'), zs)
+        # samples = np.random.binomial(1,decoder(parser.get(params, 'decoding weights'), zs))
+
         fig = plt.figure(1)
         fig.clf()
         ax = fig.add_subplot(111)
         plot_images(samples, ax, ims_per_row=images_per_row)
         plt.savefig('samples.png')
 
-    lb_grad = grad(get_batch_lower_bound)
+    final_params = adam(lb_grad, sampler_params, num_training_iters, callback=callback)
 
-    final_params = adam(lb_grad, sampler_params,
-                                                num_train_iters, callback=callback,alpha =  .01)
+    def decoder_with_weights(zs):
+        return decoder(parser.get(final_params, 'decoding weights'), zs)
+    return decoder_with_weights
 
     finish_time = time.time()
     print "total runtime", finish_time - start_time
 
+
+
+
+if __name__ == '__main__':
+    # load_and_pickle_binary_mnist()
+    with open('../../../autopaint/mnist_binary_data.pkl') as f:
+        N_data, train_images, train_labels, test_images, test_labels = pickle.load(f)
+
+    decoder = run_aevb(train_images)
 
