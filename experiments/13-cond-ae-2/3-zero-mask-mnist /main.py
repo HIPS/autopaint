@@ -18,16 +18,14 @@ from autopaint.util import WeightsParser, load_and_pickle_binary_mnist
 from autopaint.neuralnet import make_binary_nn,make_gaussian_nn
 param_scale = 0.1
 samples_per_image = 10
-latent_dimensions = 2
+latent_dimensions = 4
 hidden_units = 500
 
 from scipy.ndimage.filters import gaussian_filter
 
 def apply_mask(images):
-    zero_mask_mat = np.random.binomial(1,.3,images.shape)
-    one_mask_mat = np.random.binomial(1,.2,images.shape)
-    cur_b = np.ceil(.5*(images+one_mask_mat))
-    cur_b = cur_b*zero_mask_mat
+    zero_mask_mat = np.random.binomial(1,.33,images.shape)
+    cur_b = images*zero_mask_mat
     return cur_b
 
 

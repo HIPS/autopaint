@@ -39,7 +39,7 @@ def run_cond_aevb(base_data,cond_data):
     N_weights_dec, decoder, decoder_log_like = make_binary_nn(dec_layers)
 
     # Optimize aevb
-    batch_size = 100
+    batch_size = 1000
     num_training_iters = 1600
     rs = npr.RandomState(0)
 
